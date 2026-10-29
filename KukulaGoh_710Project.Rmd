@@ -61,6 +61,13 @@ bio_processed <- bio_raw %>%
   mutate(date = mdy(date)) %>% 
   select(usgs_universal_id:date, organism_length_mm:remarks)
 
+unique(bio_processed$sample_matrix)
+
+# I think this is what it is but might want to double check, i cound't find these exact codes in the metadata but it did mention that they tested different tissues 
+
+# Egg = eggs, MSC = muscle, LVR = liver, CAR = carcass, WB = whole body, TST =  not sure
+#
+
 ```
 
 ```{r water_dataset}
