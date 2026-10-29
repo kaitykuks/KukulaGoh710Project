@@ -18,3 +18,21 @@ rm(list=ls())  ##This code here removes all the objects from your Global Environ
 
 ```
 
+## Imporing Dataset
+
+TLDR (written by KAK): These data represent a comprehensive study combining biological Selenium (Se) accumulation in a variety of organisms across trophic levels and chemical characterisation of water and sediment in the Kootenai River of Montana. Samples were collected from three semi-annual sampling events (Fall 2020, Spring 2021, and Fall 2021). 
+
+Data availability: https://www.sciencebase.gov/catalog/item/62881e4dd34e4fef2ec3c334
+
+Summary (written by USGS): This dataset includes analyses of selenium (Se) in water, sediment, periphyton, and benthic invertebrate and fish tissues from the Kootenai River in Idaho and Montana. The samples were collected as part of a study intended to evaluate selenium distribution and bioaccumulation in the aquatic food webs of the Kootenai River. This dataset includes complete food web sample results from our first three semi-annual sampling events (fall 2020, spring 2021, and fall 2021), in addition to more limited data from September 2018-2023 (mainly water sample results). Samples were collected from four sites on the Kootenai River between Libby Dam, Montana, and the border between Idaho, USA, and British Columbia, Canada. Sites were located at about 1, 81, 105, and 185 kilometers (km) downstream from Libby Dam. An additional comparison sampling site was on Lake Creek, near Troy, Montana.
+
+The water samples were analyzed for dissolved Se and Se species, including selenite, selenate, selenocyanate, methylseleninic acid, selenomethionine, and unknown Se species. Sediment samples were collected by scooping from depositional areas in shallow, quiescent water near the river edge. Sediment samples were sieved (63 micron pore size Nitex fabric) and analyzed for Se. Three types of periphyton and suspended particulates were sampled: periphyton scraped from rocks (PRS), periphyton grown on glass microscope slides (PSL), and suspended particulate material on flow-through filters (SPM). For invertebrates, whole-body tissues were analyzed from 43 distinct benthic invertebrate taxa, and multiple tissues were additionally analyzed for one taxon, the western pearlshell mussel, Margaritifera falcata. Five fish species were targeted for repeat sampling: mountain whitefish (Prosopium williamsoni), rainbow trout (Oncorhynchus mykiss), slimy sculpin (Cottus cognatus), redside shiner (Richardsonius balteatus), and northern pikeminnow (Ptychocheilus oregonensis). Occasional samples were also obtained from 4 additional species: kokanee (Oncorhynchus nerka), brown trout (Salmo trutta), longnose sucker (Catostomus catostomus), and largescale sucker (Catostomus macrocheilus). Fish were sometimes analyzed for whole body selenium concentrations, or dissected for separate analyses of muscle, liver, egg-ovary tissues, and the carcass (everything leftover after the other tissues were removed). The specific tissue samples removed and analyzed varied by the sex and size of the fish, sampling event, and specific objectives. The total sample counts included in this dataset are 292 water sample results from 83 water samples, 27 sediment results, 114 periphyton results, 343 benthic invertebrate results, and 1,448 fish tissue results from 524 individual fish. Most analyses in the present dataset were for selenium with some additional analyses of mercury (Hg).
+
+```{r dataset}
+
+# Importing raw dataset
+
+bio_raw <- read.csv("~/KukulaGoh710Project/Data/Raw/USGS_Se_Raw_Bio_Data.csv")
+
+```
+
