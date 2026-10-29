@@ -1,0 +1,20 @@
+---
+title: "KukulaGoh710Project"
+author: "Kaitlyn Kukula"
+date: "`r Sys.Date()`"
+output: pdf_document
+---
+
+```{r libraries, message = FALSE, include = FALSE}
+
+library(moments) #package for skewness
+library(knitr) #package for making tables (kable)
+library(tidyverse) #multiple packages for data wrangling
+library(gt) # a package to make tables
+library(lubridate) # a package to manipulate dates
+library(ggplot2)
+
+rm(list=ls())  ##This code here removes all the objects from your Global Environment
+
+```
+
