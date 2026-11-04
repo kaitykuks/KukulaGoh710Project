@@ -74,8 +74,8 @@ unique(bio_processed$sample_matrix)
 ```{r water_dataset}
 
 # Importing raw datasets
-water_raw <- read.csv("~/KukulaGoh710Project/Data/Raw/USGS_Se_Raw_Water_Data.csv", skip = 1)
-
+#water_raw <- read.csv("~/KukulaGoh710Project/Data/Raw/USGS_Se_Raw_Water_Data.csv", skip = 1)
+water_raw <- read_csv("Data/Raw/USGS_Se_Raw_Water_Data.csv")
 # Initial data wrangling
 water_processed <- water_raw %>% 
   janitor::clean_names() %>% 
