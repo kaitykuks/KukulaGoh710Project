@@ -16,6 +16,7 @@ library(tidyverse) #multiple packages for data wrangling
 library(gt) # a package to make tables
 library(lubridate) # a package to manipulate dates
 library(ggplot2)
+library(readxl)
 
 rm(list=ls())
 
@@ -40,7 +41,7 @@ theme_set(kukulagoh_theme)
 
 ```
 
-## Imporing Dataset
+## Importing Dataset
 
 TLDR (written by KAK): These data represent a comprehensive study combining biological Selenium (Se) accumulation in a variety of organisms across trophic levels and chemical characterisation of water and sediment in the Kootenai River of Montana. Samples were collected from three semi-annual sampling events (Fall 2020, Spring 2021, and Fall 2021). 
 
@@ -68,7 +69,22 @@ unique(bio_processed$sample_matrix)
 # I think this is what it is but might want to double check, i cound't find these exact codes in the metadata but it did mention that they tested different tissues 
 
 # Egg = eggs, MSC = muscle, LVR = liver, CAR = carcass, WB = whole body, TST =  not sure
-#
+
+#Importing Species Dictionary
+sp_dict <- read_excel("Data/Raw/USGS_All_Data_Tables.xlsx", 
+    sheet = "Table3_Species-Dictionary", 
+    skip = 1)
+
+sp_dict <- sp_dict |>
+  select(`Species ID`, `Field nickname`, Aggregation, `General trophic state (adults)`, `Invertebrate trait state (functional classification)`) |>
+  janitor::clean_names() 
+
+sp_dict<- sp_dict |>
+    rename(
+      trophic_state = general_trophic_state_adults,
+      invert_fxn = invertebrate_trait_state_functional_classification)  
+# Sara needs to figure out how to if_else the trophic states before joining to bio_processed        
+# Joining Species
 
 ```
 
@@ -85,5 +101,14 @@ water_processed <- water_raw %>%
   select(date, season_id:remarks)
 
 ```
+
+```{r tox_data_exploration}
+#using this to figure out how to sort my data (pre-wrangling if you will)
+
+bio_processed |>
+  filter(simplified_sample_type == "fish", organism_weight_g > 2000) |>
+  print()
+```
+
 
 
