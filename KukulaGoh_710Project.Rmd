@@ -51,6 +51,8 @@ Summary (written by USGS): This dataset includes analyses of selenium (Se) in wa
 
 The water samples were analyzed for dissolved Se and Se species, including selenite, selenate, selenocyanate, methylseleninic acid, selenomethionine, and unknown Se species. Sediment samples were collected by scooping from depositional areas in shallow, quiescent water near the river edge. Sediment samples were sieved (63 micron pore size Nitex fabric) and analyzed for Se. Three types of periphyton and suspended particulates were sampled: periphyton scraped from rocks (PRS), periphyton grown on glass microscope slides (PSL), and suspended particulate material on flow-through filters (SPM). For invertebrates, whole-body tissues were analyzed from 43 distinct benthic invertebrate taxa, and multiple tissues were additionally analyzed for one taxon, the western pearlshell mussel, Margaritifera falcata. Five fish species were targeted for repeat sampling: mountain whitefish (Prosopium williamsoni), rainbow trout (Oncorhynchus mykiss), slimy sculpin (Cottus cognatus), redside shiner (Richardsonius balteatus), and northern pikeminnow (Ptychocheilus oregonensis). Occasional samples were also obtained from 4 additional species: kokanee (Oncorhynchus nerka), brown trout (Salmo trutta), longnose sucker (Catostomus catostomus), and largescale sucker (Catostomus macrocheilus). Fish were sometimes analyzed for whole body selenium concentrations, or dissected for separate analyses of muscle, liver, egg-ovary tissues, and the carcass (everything leftover after the other tissues were removed). The specific tissue samples removed and analyzed varied by the sex and size of the fish, sampling event, and specific objectives. The total sample counts included in this dataset are 292 water sample results from 83 water samples, 27 sediment results, 114 periphyton results, 343 benthic invertebrate results, and 1,448 fish tissue results from 524 individual fish. Most analyses in the present dataset were for selenium with some additional analyses of mercury (Hg).
 
+## Bio Stuff
+
 ```{r bio_dataset}
 
 # Importing raw dataset
@@ -71,44 +73,125 @@ unique(bio_processed$sample_matrix)
 # Egg = eggs, MSC = muscle, LVR = liver, CAR = carcass, WB = whole body, TST =  not sure
 
 #Importing Species Dictionary
-sp_dict <- read_excel("Data/Raw/USGS_All_Data_Tables.xlsx", 
-    sheet = "Table3_Species-Dictionary", 
+sp_dict <- read_excel("Data/Raw/USGS_All_Data_Tables.xlsx",
+    sheet = "Table3_Species-Dictionary",
     skip = 1)
 
 sp_dict <- sp_dict |>
   select(`Species ID`, `Field nickname`, Aggregation, `General trophic state (adults)`, `Invertebrate trait state (functional classification)`) |>
-  janitor::clean_names() 
+  janitor::clean_names()
 
 sp_dict<- sp_dict |>
     rename(
       trophic_state = general_trophic_state_adults,
-      invert_fxn = invertebrate_trait_state_functional_classification)  
-# Sara needs to figure out how to if_else the trophic states before joining to bio_processed        
+      invert_fxn = invertebrate_trait_state_functional_classification)
+# Sara needs to figure out how to if_else the trophic states before joining to bio_processed
 # Joining Species
 
 ```
 
-```{r water_dataset}
-
-# Importing raw datasets
-#water_raw <- read.csv("~/KukulaGoh710Project/Data/Raw/USGS_Se_Raw_Water_Data.csv", skip = 1)
-water_raw <- read_csv("Data/Raw/USGS_Se_Raw_Water_Data.csv", skip = 1)
-
-# Initial data wrangling
-water_processed <- water_raw %>% 
-  janitor::clean_names() %>% 
-  mutate(date = mdy(sample_date)) %>% 
-  select(date, season_id:remarks)
-
-```
 
 ```{r tox_data_exploration}
+
 #using this to figure out how to sort my data (pre-wrangling if you will)
 
 bio_processed |>
   filter(simplified_sample_type == "fish", organism_weight_g > 2000) |>
   print()
 ```
+
+## Water Stuff
+
+```{r water_dataset}
+
+# Importing raw datasets
+water_raw <- read_csv("Data/Raw/USGS_Se_Raw_Water_Data.csv", skip = 1) %>% 
+  janitor::clean_names()
+
+# Import location data
+location_dict <- read_excel("Data/Raw/USGS_All_Data_Tables.xlsx",
+    sheet = "Table2_Site-Dictionary",
+    skip = 1) %>% 
+  janitor::clean_names()
+
+# Initial data wrangling
+water_processed <- water_raw %>%
+  mutate(date = mdy(sample_date)) %>%            # format dates
+  filter(sample_type == "Environmental",
+         analyte != "Hg") %>%           
+  left_join(location_dict, by = "site_id") %>%   # join lat/long data
+  select(date, usgs_site_number, site_name,      # select relevant columns
+        site_id, sample_type:qualifiers, 
+        latitude, longitude)
+
+```
+
+Qualifiers:
+U - Result is < MDL
+J - > MDL but < MRL
+Z - idk but I think its okay to overlook it
+
+```{r water_data_exploration}
+
+head(water_processed)
+unique(water_processed$site_name)
+
+# Number of environmental samples in total - 261
+nrow(water_processed)
+
+# Number of entries that are below the MDL - 125
+count(water_processed %>% filter(str_detect(qualifiers, "U")))
+
+# Percentage of the dataset that contains data below the MDL - 47.89%
+round((count(water_processed %>% filter(str_detect(qualifiers, "U")))/nrow(water_processed))*100, 2)
+
+# Number of sites - 9
+unique(water_processed$site_name)
+
+# Number of dates - 29
+unique(water_processed$date)
+
+# Number of analytes - 7 
+unique(water_processed$analyte)
+
+nrow(water_processed %>% filter(year(date) == "2021"))
+
+```
+
+```{r usgs_data}
+
+# Daily data
+# 00060: Discharge
+# 00065: Gage height
+# 00010: Water temperature [degC]
+# 00400: pH
+# 00095: specific conductance [uS/cm]
+
+# Continuous data
+# 00300: dissolve oxygen [mg/L]
+# 00631: nitrate plus nitrite [mg/L]
+# 00045: precipitation [in]
+# 63680: turbidity
+# 32321: phycocyanin relative fluorescence [RFU]
+
+usgs_daily <- read_waterdata_daily(
+  monitoring_location_id = c("USGS-12301933", "USGS-12302055", "USGS-12304500",
+                             "USGS-12305000", "USGS-12307750", "USGS-12310100",
+                             "USGS-12322000", "USGS-12303500", "USGS-12301919"),
+  parameter_code = c("00060", "00065", "00010", "00400", "00095"),
+  time = c("2018-09-27", "2023-09-14")
+)
+
+usgs_cont <- read_waterdata_continuous(
+  monitoring_location_id = c("USGS-12301933", "USGS-12302055", "USGS-12304500",
+                             "USGS-12305000", "USGS-12307750", "USGS-12310100",
+                             "USGS-12322000", "USGS-12303500", "USGS-12301919"),
+  parameter_code = c("32321", "00300", "00631", "00045", "63680"),
+  time = c("2018-09-27", "2023-09-14")
+)
+```
+
+
 
 
 
