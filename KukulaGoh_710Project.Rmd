@@ -1,6 +1,6 @@
 ---
 title: "KukulaGoh710Project"
-author: "Kaitlyn Kukula"
+author: "Kaitlyn Kukula & Sara Goh"
 date: "`r Sys.Date()`"
 output: pdf_document
 editor_options: 
@@ -78,6 +78,12 @@ unique(bio_processed$sample_matrix)
 
 # Egg = eggs, MSC = muscle, LVR = liver, CAR = carcass, WB = whole body, TST =  not sure
 
+
+
+```
+
+
+```{r sp_dict wrangle}
 #Importing Species Dictionary
 sp_dict <- read_excel("Data/Raw/USGS_All_Data_Tables.xlsx",
     sheet = "Table3_Species-Dictionary",
@@ -91,20 +97,47 @@ sp_dict<- sp_dict |>
     rename(
       trophic_state = general_trophic_state_adults,
       invert_fxn = invertebrate_trait_state_functional_classification)
-# Sara needs to figure out how to if_else the trophic states before joining to bio_processed
-# Joining Species
+sp_dict <- sp_dict |>
+  mutate(
+    trophic_state = case_when(
+      aggregation == "periphyton" ~ "Periphyton",
+      species_id == "TRICH"       ~ "Carnivore",
+      species_id == "DIP"         ~ "Resource",
+      species_id == "MARG"        ~ "Filterer",
+      .default = trophic_state),
+trophic_level = case_when(
+      trophic_state %in% c("Periphyton", "Resource")                         ~ 1,
+      trophic_state %in% c("Herbivore", "Detritivore", "Filterer")           ~ 2,
+      trophic_state %in% c("Carnivore", "Planktivore", "Invertivore")        ~ 3,
+      trophic_state %in% c("Omnivore", "Piscivore", "Piscivore/invertivore") ~ 4,
+      .default = NA_real_),
+    trophic_level = factor(trophic_level,
+                           levels = 1:4,
+                           labels = c("L1_Resource", "L2_Pconsumer",
+                                      "L3_Sconsumer", "L4_TopPredator")))
+#data checks - all celar
+sp_dict |> count(trophic_state, trophic_level)
 
+sp_dict |> filter(is.na(trophic_level))
+
+#join to bio_processed
+sp_dict |> count(species_id) |> filter(n > 1)    # should return 0 rows
+anti_join(bio_processed, sp_dict, by = "species_id") |>
+  distinct(species_id)   # should return 0 rows
+
+bio_processed <- bio_processed |>
+  left_join(sp_dict, by = "species_id")
+bio_processed <- bio_processed |>
+  select(-aggregation)
+
+#Sample size checks
+bio_processed |> count(trophic_level == "L1_Resource") #n = 115
+bio_processed |> count(trophic_level == "L2_Pconsumer") #n = 296
+bio_processed |> count(trophic_level == "L3_Sconsumer") #n= 1036
+bio_processed |> count(trophic_level == "L4_TopPredator") #n = 431
+bio_processed |> filter(is.na(trophic_level)) |> count(species_id, aggregation) #missing values - SED, n = 27
 ```
 
-
-```{r tox_data_exploration}
-
-#using this to figure out how to sort my data (pre-wrangling if you will)
-
-bio_processed |>
-  filter(simplified_sample_type == "fish", organism_weight_g > 2000) |>
-  print()
-```
 
 ## Water Stuff
 
