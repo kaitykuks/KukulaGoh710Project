@@ -74,9 +74,9 @@ bio_processed <- bio_raw %>%
 
 unique(bio_processed$sample_matrix)
 
-# I think this is what it is but might want to double check, i cound't find these exact codes in the metadata but it did mention that they tested different tissues 
+# I think this is what it is but might want to double check, i couldn't find these exact codes in the metadata but it did mention that they tested different tissues 
 
-# Egg = eggs, MSC = muscle, LVR = liver, CAR = carcass, WB = whole body, TST =  not sure
+# EGG = Ovaries + eggs, MSC = muscle, LVR = liver, CAR = carcass, WB = whole body, TST =  Testes
 
 
 
@@ -136,6 +136,46 @@ bio_processed |> count(trophic_level == "L2_Pconsumer") #n = 296
 bio_processed |> count(trophic_level == "L3_Sconsumer") #n= 1036
 bio_processed |> count(trophic_level == "L4_TopPredator") #n = 431
 bio_processed |> filter(is.na(trophic_level)) |> count(species_id, aggregation) #missing values - SED, n = 27
+
+#write_csv(bio_processed, "bio_processed.csv")
+```
+
+```{r Tox_data_exploration}
+se_tissue <- bio_processed |>
+  filter(
+    simplified_sample_type == "fish",
+    analyte == "Se",
+    reporting_basis == "dw",
+    sample_matrix %in% c("Fish_EGG", "Fish_LVR", "Fish_MSC", "Fish_TST")  # drop CAR and WB - not specific tissue types
+  )
+# number of measurements per species
+se_tissue |>
+  count(species_id, sample_matrix) |>
+  pivot_wider(names_from = sample_matrix, values_from = n, values_fill = 0)
+
+se_tissue |> 
+  filter(species_id == "MWF") |>
+  distinct(usgs_universal_id, sample_matrix) |>
+  group_by(usgs_universal_id) |>
+  summarise(tissues = paste(sort(sample_matrix), collapse = "+"), .groups = "drop") |>
+  count(tissues, sort = TRUE) #checking for sufficient tissue type unique samples in MWF. n= 69 fish have all three tissue types if excluding TST (n = 4).
+
+MWF_tissue <- se_tissue |> 
+   filter(species_id == "MWF", 
+          sample_matrix %in% c("Fish_EGG", "Fish_LVR", "Fish_MSC"),
+          sample_qaqc_qualifier =="--")  
+
+complete_ids <- MWF_tissue |>
+  distinct(usgs_universal_id, sample_matrix) |>
+  count(usgs_universal_id) |>
+  filter(n == 3) |>
+  pull(usgs_universal_id)
+
+MWF_tissue_fin <- MWF_tissue |> 
+  filter(usgs_universal_id %in% complete_ids)
+
+n_distinct(MWF_tissue_fin$usgs_universal_id) # final n = 68, after filtering for qaqc and tissue types
+
 ```
 
 
