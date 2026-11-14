@@ -17,10 +17,16 @@ library(gt) # a package to make tables
 library(lubridate) # a package to manipulate dates
 library(ggplot2)
 library(readxl)
+library(dataRetrieval)
+
+```
+
+```{r}
 
 rm(list=ls())
 
 ```
+
 
 ```{r plot_theme, echo = FALSE, include = FALSE}
 
@@ -133,124 +139,40 @@ U - Result is < MDL
 J - > MDL but < MRL
 Z - idk but I think its okay to overlook it
 
-```{r usgs_data_raw}
 
-# Daily data
-# 00060: Discharge
-# 00065: Gage height
-# 00010: Water temperature [degC]
-# 00400: pH
-# 00095: specific conductance [uS/cm]
+Daily data
+00060: Discharge
+00065: Gage height
+00010: Water temperature [degC]
+00400: pH
+00095: specific conductance [uS/cm]
 
-# Continuous data
-# 00300: dissolve oxygen [mg/L]
-# 00045: precipitation [in]
-# 63680: turbidity
+Continuous data
+00300: dissolve oxygen [mg/L]
+32321: Pycocyanin relative fluorescence [RFU]
+63680: turbidity
+32315: Chlorophyll relative fluorescence [RFU]
 
-library(dataRetrieval)
 
-usgs_cont_ph <- rbind(
+```{r usgs_daily_data}
+
+# Daily average of discharge, gage, temperature, pH, and specific conductance from daily data
+
+usgs_daily_raw <- 
   
-  read_waterdata_continuous(
+  read_waterdata_daily(
   monitoring_location_id = c("USGS-12301933", "USGS-12302055", "USGS-12304500",
                              "USGS-12305000", "USGS-12307750", "USGS-12310100",
                              "USGS-12322000", "USGS-12303500", "USGS-12301919"),
-  parameter_code = c("00400"),
-  time = c("2018-03-28", "2019-03-27")),
-  
-  read_waterdata_continuous(
-  monitoring_location_id = c("USGS-12301933", "USGS-12302055", "USGS-12304500",
-                             "USGS-12305000", "USGS-12307750", "USGS-12310100",
-                             "USGS-12322000", "USGS-12303500", "USGS-12301919"),
-  parameter_code = c("00400"),
-  time = c("2019-03-28", "2021-09-14")),
-  
-  read_waterdata_continuous(
-  monitoring_location_id = c("USGS-12301933", "USGS-12302055", "USGS-12304500",
-                             "USGS-12305000", "USGS-12307750", "USGS-12310100",
-                             "USGS-12322000", "USGS-12303500", "USGS-12301919"),
-  parameter_code = c("00400"),
-  time = c("2021-09-15", "2023-09-14"))
-  
-)
+  parameter_code = c("00060", "00065", "00010", "00400", "00095"),
+  time = c("2018-03-28", "2023-09-14"))
 
-usgs_cont_minors <- rbind(
-  
-  read_waterdata_continuous(
-  monitoring_location_id = c("USGS-12301933", "USGS-12302055", "USGS-12304500",
-                             "USGS-12305000", "USGS-12307750", "USGS-12310100",
-                             "USGS-12322000", "USGS-12303500", "USGS-12301919"),
-  parameter_code = c("00300", "63680", "32321"),
-  time = c("2018-09-28", "2020-09-27")),
-
-  read_waterdata_continuous(
-  monitoring_location_id = c("USGS-12301933", "USGS-12302055", "USGS-12304500",
-                             "USGS-12305000", "USGS-12307750", "USGS-12310100",
-                             "USGS-12322000", "USGS-12303500", "USGS-12301919"),
-  parameter_code = c("00300", "63680", "32321"),
-  time = c("2020-09-28", "2021-09-28")),
-
-  read_waterdata_continuous(
-  monitoring_location_id = c("USGS-12301933", "USGS-12302055", "USGS-12304500",
-                             "USGS-12305000", "USGS-12307750", "USGS-12310100",
-                             "USGS-12322000", "USGS-12303500", "USGS-12301919"),
-  parameter_code = c("00300", "63680", "32321"),
-  time = c("2021-09-29", "2022-09-14")),
-
-  read_waterdata_continuous(
-  monitoring_location_id = c("USGS-12301933", "USGS-12302055", "USGS-12304500",
-                             "USGS-12305000", "USGS-12307750", "USGS-12310100",
-                             "USGS-12322000", "USGS-12303500", "USGS-12301919"),
-  parameter_code = c("00300", "63680", "32321"),
-  time = c("2022-09-15", "2023-09-14"))
-  
-)
-
-usgs_cont_metabolism <- rbind(
-  
-  read_waterdata_continuous(
-  monitoring_location_id = c("USGS-12301933", "USGS-12302055", "USGS-12304500",
-                             "USGS-12305000", "USGS-12307750", "USGS-12310100",
-                             "USGS-12322000", "USGS-12303500", "USGS-12301919"),
-  parameter_code = c("32315"),
-  time = c("2018-09-28", "2020-09-27")),
-
-  read_waterdata_continuous(
-  monitoring_location_id = c("USGS-12301933", "USGS-12302055", "USGS-12304500",
-                             "USGS-12305000", "USGS-12307750", "USGS-12310100",
-                             "USGS-12322000", "USGS-12303500", "USGS-12301919"),
-  parameter_code = c("32315"),
-  time = c("2020-09-28", "2021-09-28")),
-
-  read_waterdata_continuous(
-  monitoring_location_id = c("USGS-12301933", "USGS-12302055", "USGS-12304500",
-                             "USGS-12305000", "USGS-12307750", "USGS-12310100",
-                             "USGS-12322000", "USGS-12303500", "USGS-12301919"),
-  parameter_code = c("32315"),
-  time = c("2021-09-29", "2022-09-14")),
-
-  read_waterdata_continuous(
-  monitoring_location_id = c("USGS-12301933", "USGS-12302055", "USGS-12304500",
-                             "USGS-12305000", "USGS-12307750", "USGS-12310100",
-                             "USGS-12322000", "USGS-12303500", "USGS-12301919"),
-  parameter_code = c("32315"),
-  time = c("2022-09-15", "2023-09-14"))
-  
-)
-
-
-## Need to make a usgs column with just the site numbers, average all measurements 
-# across the seasons defined, then join to the dataset
-
-```
-
-```{r usgs_data_processed}
-
-# Total dissolved Se concentrations in water samples and water quality parameters from the Kootenai River watershed study area in the Spring
+# Processed
 
 usgs_daily_processed <- usgs_daily_raw %>% 
   mutate(year = year(time),
          month = month(time),
+         day = day(time),
          season = case_when(month %in% c(3,4,5) ~ "Spring",
                             month %in% c(8,9,10) ~ "Fall")) %>% 
   na.omit(season) %>% 
@@ -263,31 +185,177 @@ usgs_daily_processed <- usgs_daily_raw %>%
                                parameter_code == "00010" ~ "temperature",
                                parameter_code == "00400" ~ "pH",
                                parameter_code == "00095" ~ "specific_conductance")) %>% 
-  group_by(year, season, usgs_site_number, parameter) %>% 
-  summarise(mean = mean(value)) %>% 
-  ungroup() %>% 
-  pivot_wider(names_from = parameter, values_from = mean)
-
-
-usgs_pH_processed <- usgs_cont_ph %>% 
-  mutate(date = as.Date(time)) %>% 
-  mutate(year = year(time),
-         month = month(time),
-         season = case_when(month %in% c(3,4,5) ~ "Spring",
-                            month %in% c(8,9,10) ~ "Fall")) %>% 
-  filter(season == c("Spring", "Fall")) %>% 
-  separate_wider_delim(
-  cols = monitoring_location_id, 
-  delim = "USGS-", 
-  names = c("holder", "usgs_site_number")) %>% 
-  mutate(parameter = case_when(parameter_code == "00400" ~ "pH")) %>% 
-  group_by(year, season, usgs_site_number, parameter) %>% 
+  group_by(year, month, day, season, usgs_site_number, parameter) %>% 
   summarise(mean = mean(value)) %>% 
   ungroup() %>% 
   pivot_wider(names_from = parameter, values_from = mean)
 
 ```
 
+```{r usgs_cont_ph}
+
+# Daily average of pH from continuous data
+
+usgs_cont_ph_raw <- rbind(
+  
+  read_waterdata_continuous(
+  monitoring_location_id = c("USGS-12301933", "USGS-12302055", "USGS-12304500",
+                             "USGS-12305000", "USGS-12307750", "USGS-12310100",
+                             "USGS-12322000", "USGS-12303500", "USGS-12301919"),
+  parameter_code = c("00400"), time = c("2018-03-28", "2019-03-27")),
+  
+  read_waterdata_continuous(
+  monitoring_location_id = c("USGS-12301933", "USGS-12302055", "USGS-12304500",
+                             "USGS-12305000", "USGS-12307750", "USGS-12310100",
+                             "USGS-12322000", "USGS-12303500", "USGS-12301919"),
+  parameter_code = c("00400"), time = c("2019-03-28", "2021-09-14")),
+  
+  read_waterdata_continuous(
+  monitoring_location_id = c("USGS-12301933", "USGS-12302055", "USGS-12304500",
+                             "USGS-12305000", "USGS-12307750", "USGS-12310100",
+                             "USGS-12322000", "USGS-12303500", "USGS-12301919"),
+  parameter_code = c("00400"), time = c("2021-09-15", "2023-09-14")))
+
+# Processed
+
+usgs_cont_ph_processed <- usgs_cont_ph_raw %>% 
+  mutate(date = as.Date(time),
+         year = year(time),
+         month = month(time),
+         day = day(time),
+         season = case_when(month %in% c(3,4,5) ~ "Spring",
+                            month %in% c(8,9,10) ~ "Fall")) %>% 
+  filter(season == c("Fall", "Spring")) %>% 
+  separate_wider_delim(
+  cols = monitoring_location_id, 
+  delim = "USGS-", 
+  names = c("holder", "usgs_site_number")) %>% 
+  mutate(parameter = case_when(parameter_code == "00400" ~ "pH")) %>% 
+  group_by(year, month, day, date, season, usgs_site_number, parameter) %>% 
+  summarise(mean = mean(value)) %>% 
+  ungroup() %>% 
+  pivot_wider(names_from = parameter, values_from = mean)
+
+```
+
+
+```{r usgs_cont_minors}
+
+# Daily average of minor parameters from continuous data
+
+usgs_cont_minors_raw <- rbind(
+  
+  read_waterdata_continuous(
+  monitoring_location_id = c("USGS-12301933", "USGS-12302055", "USGS-12304500",
+                             "USGS-12305000", "USGS-12307750", "USGS-12310100",
+                             "USGS-12322000", "USGS-12303500", "USGS-12301919"),
+  parameter_code = c("00300", "63680", "32321"),
+  time = c("2018-09-28", "2020-09-27")),
+
+  read_waterdata_continuous(
+  monitoring_location_id = c("USGS-12301933", "USGS-12302055", "USGS-12304500",
+                             "USGS-12305000", "USGS-12307750", "USGS-12310100",
+                             "USGS-12322000", "USGS-12303500", "USGS-12301919"),
+  parameter_code = c("00300", "63680", "32321"),
+  time = c("2020-09-28", "2021-09-28")),
+
+  read_waterdata_continuous(
+  monitoring_location_id = c("USGS-12301933", "USGS-12302055", "USGS-12304500",
+                             "USGS-12305000", "USGS-12307750", "USGS-12310100",
+                             "USGS-12322000", "USGS-12303500", "USGS-12301919"),
+  parameter_code = c("00300", "63680", "32321"),
+  time = c("2021-09-29", "2022-09-14")),
+
+  read_waterdata_continuous(
+  monitoring_location_id = c("USGS-12301933", "USGS-12302055", "USGS-12304500",
+                             "USGS-12305000", "USGS-12307750", "USGS-12310100",
+                             "USGS-12322000", "USGS-12303500", "USGS-12301919"),
+  parameter_code = c("00300", "63680", "32321"),
+  time = c("2022-09-15", "2023-09-14"))
+  
+)
+
+usgs_cont_metabolism_raw <- rbind(
+  
+  read_waterdata_continuous(
+  monitoring_location_id = c("USGS-12301933", "USGS-12302055", "USGS-12304500",
+                             "USGS-12305000", "USGS-12307750", "USGS-12310100",
+                             "USGS-12322000", "USGS-12303500", "USGS-12301919"),
+  parameter_code = c("32315"),
+  time = c("2018-09-28", "2020-09-27")),
+
+  read_waterdata_continuous(
+  monitoring_location_id = c("USGS-12301933", "USGS-12302055", "USGS-12304500",
+                             "USGS-12305000", "USGS-12307750", "USGS-12310100",
+                             "USGS-12322000", "USGS-12303500", "USGS-12301919"),
+  parameter_code = c("32315"),
+  time = c("2020-09-28", "2021-09-28")),
+
+  read_waterdata_continuous(
+  monitoring_location_id = c("USGS-12301933", "USGS-12302055", "USGS-12304500",
+                             "USGS-12305000", "USGS-12307750", "USGS-12310100",
+                             "USGS-12322000", "USGS-12303500", "USGS-12301919"),
+  parameter_code = c("32315"),
+  time = c("2021-09-29", "2022-09-14")),
+
+  read_waterdata_continuous(
+  monitoring_location_id = c("USGS-12301933", "USGS-12302055", "USGS-12304500",
+                             "USGS-12305000", "USGS-12307750", "USGS-12310100",
+                             "USGS-12322000", "USGS-12303500", "USGS-12301919"),
+  parameter_code = c("32315"),
+  time = c("2022-09-15", "2023-09-14")))
+
+# Processed
+
+usgs_cont_metabolism_processed <- usgs_cont_metabolism_raw %>% 
+  mutate(date = as.Date(time),
+         year = year(time),
+         month = month(time),
+         day = day(time),
+         season = case_when(month %in% c(3,4,5) ~ "Spring",
+                            month %in% c(8,9,10) ~ "Fall")) %>% 
+  filter(season == c("Fall", "Spring")) %>% 
+  separate_wider_delim(
+  cols = monitoring_location_id, 
+  delim = "USGS-", 
+  names = c("holder", "usgs_site_number")) %>% 
+  mutate(parameter = case_when(parameter_code == "32315" ~ "chlorophyll")) %>% 
+  group_by(year, month, day, date, season, usgs_site_number, parameter) %>% 
+  summarise(mean = mean(value)) %>% 
+  ungroup() %>% 
+  pivot_wider(names_from = parameter, values_from = mean)
+
+usgs_cont_minors_processed <- usgs_cont_minors_raw %>% 
+  mutate(date = as.Date(time),
+         year = year(time),
+         month = month(time),
+         day = day(time),
+         season = case_when(month %in% c(3,4,5) ~ "Spring",
+                            month %in% c(8,9,10) ~ "Fall")) %>% 
+  filter(season == c("Fall", "Spring")) %>% 
+  separate_wider_delim(
+  cols = monitoring_location_id, 
+  delim = "USGS-", 
+  names = c("holder", "usgs_site_number")) %>% 
+  mutate(parameter = case_when(parameter_code == "32321" ~ "phycocyanin",
+                               parameter_code == "00300" ~ "dis_oxygen",
+                               parameter_code == "63680" ~ "turbidity")) %>% 
+  group_by(year, month, day, date, season, usgs_site_number, parameter) %>% 
+  summarise(mean = mean(value)) %>% 
+  ungroup() %>% 
+  pivot_wider(names_from = parameter, values_from = mean)
+
+```
+
+```{r usgs_cont_full}
+
+water_lm_usgs_df <- usgs_cont_metabolism_processed %>% 
+  full_join(usgs_cont_minors_processed,
+            by = c("usgs_site_number", "date", "year", "month", "day", "season")) %>%
+  full_join(usgs_cont_ph_processed,
+            by = c("usgs_site_number", "date", "year", "month", "day", "season"))
+
+```
 
 ### Exploration, Visualization, and Data Summaries
 
@@ -385,7 +453,7 @@ Data were averaged over the Spring and Fall months defined.
 
 ```{r linear_model_dataset}
 
-water_lm_df <- water_processed %>% 
+water_lm_se_df <- water_processed %>% 
   mutate(year = year(date),
          month = month(date),
          season = case_when(month %in% c(3,4,5) ~ "Spring",
@@ -395,12 +463,7 @@ water_lm_df <- water_processed %>%
   group_by(site_name, year, season, usgs_site_number) %>%
   summarise(total_se = sum(result, na.rm = TRUE)) %>% 
   ungroup() %>% 
-  arrange(year) %>% 
-  left_join(usgs_daily_processed, by = c("usgs_site_number", "year", "season"),
-            usgs_pH_processed, by = c("usgs_site_number", "year", "season")) 
-
-
-
+  arrange(year)
 
 ```
 
