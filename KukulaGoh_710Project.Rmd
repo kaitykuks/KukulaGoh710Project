@@ -154,7 +154,50 @@ unique(water_processed$date)
 # Number of analytes - 7 
 unique(water_processed$analyte)
 
-nrow(water_processed %>% filter(year(date) == "2021"))
+water_processed %>% filter(year(date) == "2021")
+
+# Summary statistics for dissolved Se concentrations in water samples from the Kootenai River watershed study area in April 2021
+test <- water_processed %>% filter(year(date) == "2021", month(date) == "4") %>%
+  group_by(analyte) %>% 
+  summarise(n = length(result),
+            minimum = min(result),
+            q25 = quantile(result, probs = 0.25),
+            mean = round(mean(result), 4),
+            median = median(result),
+            q75 = quantile(result, probs = 0.75),
+            maximum = max(result))
+
+
+
+# Total dissolved Se concentrations in water samples from the Kootenai River watershed study area in the Spring
+hello <- water_processed %>% 
+  mutate(year = year(date),
+         month = month(date),
+         season = case_when(month %in% c(3,4,5) ~ "Spring",
+                            month %in% c(8,9,10) ~ "Fall")) %>% 
+  na.omit(season) %>% 
+  select(month, year, season, site_name, site_id, usgs_site_number, analyte, result) %>% 
+  group_by(site_name, year, season, usgs_site_number) %>%
+  summarise(total = sum(result, na.rm = TRUE)) %>% 
+  ungroup() %>% 
+  arrange(year) 
+
+hello_usgs <- 
+
+# Total dissolved Se concentrations in water samples from the Kootenai River watershed study area in the Spring
+world <- water_processed %>% 
+  mutate(year = year(date),
+         month = month(date),
+         season = case_when(month %in% c(3,4,5) ~ "Spring",
+                            month %in% c(8,9,10) ~ "Fall")) %>% 
+  na.omit(season) %>% 
+  select(month, year, season, site_name, site_id, analyte, result) %>% 
+  group_by(site_name, year, season) %>%
+  summarise(total = sum(result, na.rm = TRUE)) %>% 
+  ungroup() %>% 
+  arrange(year) %>% 
+  filter(season == "Spring") %>% 
+  pivot_wider(names_from = year, values_from = total)
 
 ```
 
@@ -174,6 +217,9 @@ nrow(water_processed %>% filter(year(date) == "2021"))
 # 63680: turbidity
 # 32321: phycocyanin relative fluorescence [RFU]
 
+library(dataRetrieval)
+
+# Retreive USGS daily data
 usgs_daily <- read_waterdata_daily(
   monitoring_location_id = c("USGS-12301933", "USGS-12302055", "USGS-12304500",
                              "USGS-12305000", "USGS-12307750", "USGS-12310100",
@@ -182,13 +228,39 @@ usgs_daily <- read_waterdata_daily(
   time = c("2018-09-27", "2023-09-14")
 )
 
-usgs_cont <- read_waterdata_continuous(
+unique(usgs_cont_raw5$parameter_code)
+
+# Retreieve USGS continuous data (multiple steps needed)
+usgs_cont_raw1 <- read_waterdata_continuous(
   monitoring_location_id = c("USGS-12301933", "USGS-12302055", "USGS-12304500",
                              "USGS-12305000", "USGS-12307750", "USGS-12310100",
                              "USGS-12322000", "USGS-12303500", "USGS-12301919"),
-  parameter_code = c("32321", "00300", "00631", "00045", "63680"),
-  time = c("2018-09-27", "2023-09-14")
-)
+  parameter_code = c("00300", "63680", "32321"),
+  time = c("2018-09-27", "2020-09-27"))
+
+usgs_cont_raw2 <- read_waterdata_continuous(
+  monitoring_location_id = c("USGS-12301933", "USGS-12302055", "USGS-12304500",
+                             "USGS-12305000", "USGS-12307750", "USGS-12310100",
+                             "USGS-12322000", "USGS-12303500", "USGS-12301919"),
+  parameter_code = c("00300", "63680", "32321"),
+  time = c("2020-09-28", "2021-09-28"))
+
+usgs_cont_raw3 <- read_waterdata_continuous(
+  monitoring_location_id = c("USGS-12301933", "USGS-12302055", "USGS-12304500",
+                             "USGS-12305000", "USGS-12307750", "USGS-12310100",
+                             "USGS-12322000", "USGS-12303500", "USGS-12301919"),
+  parameter_code = c("00300", "63680", "32321"),
+  time = c("2021-09-29", "2022-09-14"))
+
+usgs_cont_raw4 <- read_waterdata_continuous(
+  monitoring_location_id = c("USGS-12301933", "USGS-12302055", "USGS-12304500",
+                             "USGS-12305000", "USGS-12307750", "USGS-12310100",
+                             "USGS-12322000", "USGS-12303500", "USGS-12301919"),
+  parameter_code = c("00300", "63680", "32321"),
+  time = c("2022-09-15", "2023-09-14"))
+
+usgs_cont <- rbind(usgs_cont_raw1, usgs_cont_raw2, usgs_cont_raw3, usgs_cont_raw4)
+
 ```
 
 
