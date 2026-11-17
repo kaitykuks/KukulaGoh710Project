@@ -7,10 +7,6 @@ editor_options:
   chunk_output_type: console
 ---
 
-
-test
-
-
 ```{r libraries, message = FALSE, include = FALSE}
 
 library(moments) #package for skewness
