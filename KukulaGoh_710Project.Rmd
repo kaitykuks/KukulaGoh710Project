@@ -124,9 +124,12 @@ sp_dict |> count(trophic_state, trophic_level)
 sp_dict |> filter(is.na(trophic_level))
 
 #join to bio_processed
-sp_dict |> count(species_id) |> filter(n > 1)    # should return 0 rows
+sp_dict |> 
+  count(species_id) |> 
+  filter(n > 1)    # should return 0 rows - checking for duplicate species IDs
+
 anti_join(bio_processed, sp_dict, by = "species_id") |>
-  distinct(species_id)   # should return 0 rows
+  distinct(species_id)   # should return 0 rows - checking that no Species IDs are duplicated with join
 
 bio_processed <- bio_processed |>
   left_join(sp_dict, by = "species_id")
@@ -476,7 +479,7 @@ se_speciation_watershed_seasonal <- water_processed %>%
 
 # Summed dissolved Se speciation in water samples in the Kootenai River watershed and percentage of total dissolved Se concentration in 2021
 se_speciation_site_2021 <- water_processed %>% 
-  filter(year(date) == "2021") %>% 
+  filter(year(date) == "2022") %>% 
   mutate(year = year(date),
          month = month(date),
          season = case_when(month %in% c(3,4,5) ~ "Spring",
