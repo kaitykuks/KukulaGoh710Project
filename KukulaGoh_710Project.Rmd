@@ -198,6 +198,15 @@ location_dict <- read_excel("Data/Raw/USGS_All_Data_Tables.xlsx",
   janitor::clean_names()
 
 # Initial data wrangling
+
+sediment_holder <- bio_processed %>% 
+  filter(simplified_sample_type == "sediment",
+         results_calculation != "average") %>% 
+  select(usgs_universal_id:site_id, date, analyte, results_calculation, result_value_mg_kg) %>% 
+  mutate(analyte = case_when(analyte == "Se" ~ "Se(part)"),
+         site_id = case_when(site_id == "KR13D" ~ "KR13",
+                             .default = site_id))
+
 water_processed <- water_raw %>%
   mutate(date = mdy(sample_date)) %>%            # format dates
   filter(sample_type == "Environmental",
@@ -205,9 +214,16 @@ water_processed <- water_raw %>%
   left_join(location_dict, by = "site_id") %>%   # join lat/long data
   select(date, usgs_site_number, site_name,      # select relevant columns
         site_id, sample_type:qualifiers, 
-        latitude, longitude)
+        latitude, longitude) %>% 
+  mutate(usgs_site_number = case_when(usgs_site_number == "12307750" ~ "12309500",
+                                      usgs_site_number == "12303500" ~ "12304500",
+                                      usgs_site_number == "12301919" ~ "12301933",
+                                      .default = usgs_site_number)) %>% 
+  full_join(sediment_processed)
 
 ```
+
+The original dataset contained three USGS sites that did not contain any gauge data (12307750, 12304500, and 12301933). These three sites were matched to the next closest USGS gauge station with at least discharge data available.
 
 Qualifiers:
 U - Result is < MDL
@@ -425,6 +441,7 @@ usgs_cont_minors_processed <- usgs_cont_minors_raw %>%
          season = case_when(month %in% c(3,4,5) ~ "Spring",
                             month %in% c(8,9,10) ~ "Fall")) %>% 
   filter(season %in% c("Fall", "Spring")) %>% 
+  select(-phycocyanin) %>% 
   arrange(year, month, day)
 
 ```
@@ -433,28 +450,15 @@ usgs_cont_minors_processed <- usgs_cont_minors_raw %>%
 
 ```{r water_data_exploration}
 
-head(water_processed)
-unique(water_processed$site_name)
+# Summary stats of processed data
 
-# Number of environmental samples in total - 261
-nrow(water_processed)
-
-# Number of entries that are below the MDL - 125
-count(water_processed %>% filter(str_detect(qualifiers, "U")))
-
-# Percentage of the dataset that contains data below the MDL - 47.89%
-round((count(water_processed %>% filter(str_detect(qualifiers, "U")))/nrow(water_processed))*100, 2)
-
-# Number of sites - 9
-unique(water_processed$site_name)
-
-# Number of dates - 29
-unique(water_processed$date)
-
-# Number of analytes - 7 
-unique(water_processed$analyte)
-
-water_processed %>% filter(year(date) == "2021")
+water_processed_stats <- water_processed %>% 
+  summarise(length(site_name),
+            n_distinct(usgs_site_number),
+            n_distinct(site_name),
+            n_distinct(analyte),
+            n_distinct(year(date))) %>%
+  mutate(perc_MDL = round((count(water_processed %>% filter(str_detect(qualifiers, "U")))/nrow(water_processed))*100, 2))
 
 # Summary statistics for dissolved Se concentrations in water samples from the Kootenai River watershed study area by season (across all study years, 2018-2023)
 se_speciation_watershed_seasonal <- water_processed %>%
@@ -475,7 +479,8 @@ se_speciation_watershed_seasonal <- water_processed %>%
 
 # Summed dissolved Se speciation in water samples in the Kootenai River watershed and percentage of total dissolved Se concentration in 2021
 se_speciation_site_2021 <- water_processed %>% 
-  filter(year(date) == "2022") %>% 
+  filter(year(date) == "2022",
+         analyte != "Se(part)") %>% 
   mutate(year = year(date),
          month = month(date),
          season = case_when(month %in% c(3,4,5) ~ "Spring",
@@ -497,6 +502,19 @@ se_speciation_site_2021_plot <- ggplot(se_speciation_site_2021,
   theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1),
         legend.position = "right")
 se_speciation_site_2021_plot
+
+# Summed dissolved and suspended Se speciation in water samples in the Kootenai River watershed with sediment data and percentage of total dissolved Se concentration in 2021
+
+se_full_speciation_site_2021 <- water_processed %>% 
+  filter(year(date) == "2021",
+         site_id %in% c("KR13", "KR2", "KR6", "KR9.2", "LC")) %>% 
+  mutate(year = year(date),
+         month = month(date),
+         season = case_when(month %in% c(3,4,5) ~ "Spring",
+                            month %in% c(8,9,10) ~ "Fall")) %>%
+  group_by(site_name, analyte, season, date, year, month) %>% 
+  summarise(total = sum(result, na.rm = TRUE)) %>% 
+  ungroup()
 
 # Total dissolved Se concentrations in water samples from the Kootenai River watershed study area in the Spring
 world <- water_processed %>% 
