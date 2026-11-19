@@ -132,17 +132,25 @@ bio_processed <- bio_processed |>
 # bio_processed <- bio_processed |>
 #   select(-aggregation)
 
+trophic_df <- bio_processed |> 
+  filter(results_calculation=="raw", 
+         analyte == "Se")
+
+n_distinct(trophic_df$usgs_universal_id) # of unique taxa sampled (grouping matrices)
+  
 #Sample size checks
-bio_processed |> count(trophic_level == "L1_Resource") #n = 115
-bio_processed |> count(trophic_level == "L2_Pconsumer") #n = 296
-bio_processed |> count(trophic_level == "L3_Sconsumer") #n= 1036
-bio_processed |> count(trophic_level == "L4_TopPredator") #n = 431
-bio_processed |> filter(is.na(trophic_level)) |> count(species_id, aggregation) #missing values - SED, n = 27
+trophic_df |> count(trophic_level == "L1_Resource") #n = 115
+trophic_df |> count(trophic_level == "L2_Pconsumer") #n = 296
+trophic_df |> count(trophic_level == "L3_Sconsumer") #n= 1036
+trophic_df |> count(trophic_level == "L4_TopPredator") #n = 431
+trophic_df |> 
+  filter(is.na(trophic_level)) |> 
+  count(species_id, aggregation) #missing values - SED, n = 27
 
 #write_csv(bio_processed, "bio_processed.csv")
 ```
 
-```{r Tox_data_exploration}
+```{r Tissue data wrangling}
 se_tissue <- bio_processed |>
   filter(
     simplified_sample_type == "fish",
@@ -174,11 +182,13 @@ complete_ids <- MWF_tissue |>
   pull(usgs_universal_id)
 
 MWF_tissue_fin <- MWF_tissue |> 
-  filter(usgs_universal_id %in% complete_ids)
+  filter(usgs_universal_id %in% complete_ids) |> 
+  filter(results_calculation == "raw")
 
 n_distinct(MWF_tissue_fin$usgs_universal_id) # final n = 68, after filtering for qaqc and tissue types
 
 ```
+
 
 
 ## Water Stuff
