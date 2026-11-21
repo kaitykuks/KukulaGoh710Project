@@ -18,7 +18,8 @@ library(ggplot2)
 library(readxl)
 library(dataRetrieval)
 library(moments)
-
+install.packages(c("performance", "see"))
+library(performance)
 ```
 
 ```{r}
@@ -229,7 +230,7 @@ nrow(tissue_df)                  # no. of observations
 
 levels(tissue_df$tissue)
 
-write_csv(tissue_df, "tissue_df.csv")
+#write_csv(tissue_df, "tissue_df.csv")
 
 ```
 
@@ -334,6 +335,13 @@ tissue_comp_hist <- tissue_df |>
   theme_bw()
 
 tissue_comp_hist
+
+```
+
+```{r model}
+tissue_aov <- lm(se~tissue, data=tissue_df)
+tissue_aov
+performance::check_model(tissue_aov)
 
 ```
 
