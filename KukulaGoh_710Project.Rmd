@@ -20,6 +20,7 @@ library(dataRetrieval)
 library(moments)
 install.packages(c("performance", "see"))
 library(performance)
+library(emmeans)
 ```
 
 ```{r}
@@ -194,7 +195,7 @@ se_tissue |>
   summarise(tissues = paste(sort(sample_matrix), collapse = "+"), .groups = "drop") |>
   count(tissues, sort = TRUE) #checking for sufficient tissue type unique samples in MWF. n= 69 obs have all three tissue types if excluding TST (n = 4).
 
-# ---- MWF_tissue: ALL MWF fish with at least one of the three tissues ----
+#MWF_tissue: ALL MWF fish with at least one of the three tissues
 MWF_tissue <- se_tissue |>
   filter(species_id == "MWF",
          sample_matrix %in% c("Fish_EGG", "Fish_LVR", "Fish_MSC"),
@@ -211,7 +212,7 @@ stopifnot(!any(duplicated(MWF_tissue[c("fish_id", "tissue")])))  # one row per f
 
 n_distinct(MWF_tissue$fish_id)   # fish with >= 1 tissue (all filters applied)
 
-# ---- tissue_df: fish with ALL three tissues (complete cases) ----
+#tissue_df: fish with ALL three tissues (complete cases)
 
 complete_ids <- MWF_tissue |>
   distinct(fish_id, tissue) |>
@@ -338,11 +339,20 @@ tissue_comp_hist
 
 ```
 
-```{r model}
-tissue_aov <- lm(se~tissue, data=tissue_df)
-tissue_aov
-performance::check_model(tissue_aov)
+```{r tissue model}
+#Initial model: within subjects rep measure ANOVA
+within_tissue_aov <- afex::aov_ez(
+  id = "fish_id",
+  dv = "se",
+  data = tissue_df,
+  between = NULL,
+  within = "tissue")
+summary(within_tissue_aov) #includes Mauchly test for sphericity + GG/HF corrections
+print(within_tissue_aov) # prints GG corrected values on the model
 
+#posthoc
+emmeans(within_tissue_aov, ~tissue) |> 
+  pairs(adjust="tukey")
 ```
 
 
