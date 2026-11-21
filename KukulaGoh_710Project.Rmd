@@ -17,6 +17,7 @@ library(lubridate) # a package to manipulate dates
 library(ggplot2)
 library(readxl)
 library(dataRetrieval)
+library(moments)
 
 ```
 
@@ -43,6 +44,18 @@ kukulagoh_theme <- theme_classic() +
 
 # Set theme globally
 theme_set(kukulagoh_theme)
+
+# Summ stats function for Se
+summ_fun <- function(d) d |>
+  summarise(n        = n(),
+            mean     = mean(se),
+            sd       = sd(se),
+            median   = median(se),
+            IQR      = IQR(se),
+            min      = min(se),
+            max      = max(se),
+            skewness = skewness(se),
+            .groups = "drop")
 
 ```
 
@@ -147,45 +160,180 @@ trophic_df |>
   filter(is.na(trophic_level)) |> 
   count(species_id, aggregation) #missing values - SED, n = 27
 
-#write_csv(bio_processed, "bio_processed.csv")
+write_csv(trophic_df, "trophic_df.csv")
+
 ```
 
-```{r Tissue data wrangling}
+
+# Question 3: Does Se concentration differ between tissue types in Mountain Whitefish?
+## Hypotheses
+H0: mean ln(Se) is equal in muscle, liver, and egg:  mu_muscle = mu_liver = mu_egg
+       (i.e., the geometric mean Se does not differ among tissues)
+Ha: at least one tissue differs.
+alpha = 0.05; post hoc pairwise contrasts with Tukey/Holm adjustment.
+
+```{r 3a_Tissue data wrangling}
 se_tissue <- bio_processed |>
   filter(
     simplified_sample_type == "fish",
     analyte == "Se",
     reporting_basis == "dw",
-    sample_matrix %in% c("Fish_EGG", "Fish_LVR", "Fish_MSC", "Fish_TST")  # drop CAR and WB - not specific tissue types
+    sample_matrix %in% c("Fish_EGG", "Fish_LVR", "Fish_MSC", "Fish_TST")  # CAR and WB excluded: whole-body burden, not specific tissues
   )
 # number of measurements per species
 se_tissue |>
   count(species_id, sample_matrix) |>
   pivot_wider(names_from = sample_matrix, values_from = n, values_fill = 0)
 
-se_tissue |> 
+# tissue combinations per MWF fish (before QA filters)
+se_tissue |>
   filter(species_id == "MWF") |>
   distinct(usgs_universal_id, sample_matrix) |>
   group_by(usgs_universal_id) |>
   summarise(tissues = paste(sort(sample_matrix), collapse = "+"), .groups = "drop") |>
-  count(tissues, sort = TRUE) #checking for sufficient tissue type unique samples in MWF. n= 69 fish have all three tissue types if excluding TST (n = 4).
+  count(tissues, sort = TRUE) #checking for sufficient tissue type unique samples in MWF. n= 69 obs have all three tissue types if excluding TST (n = 4).
 
-MWF_tissue <- se_tissue |> 
-   filter(species_id == "MWF", 
-          sample_matrix %in% c("Fish_EGG", "Fish_LVR", "Fish_MSC"),
-          sample_qaqc_qualifier =="--")  
+# ---- MWF_tissue: ALL MWF fish with at least one of the three tissues ----
+MWF_tissue <- se_tissue |>
+  filter(species_id == "MWF",
+         sample_matrix %in% c("Fish_EGG", "Fish_LVR", "Fish_MSC"),
+         sample_qaqc_qualifier == "--",
+         results_calculation == "raw") |>
+  mutate(fish_id = factor(usgs_universal_id),
+         tissue  = factor(sample_matrix,
+                          levels = c("Fish_MSC", "Fish_LVR", "Fish_EGG"),
+                          labels = c("Muscle", "Liver", "Egg")),
+         site_id = factor(site_id),
+         se      = result_value_mg_kg)
+
+stopifnot(!any(duplicated(MWF_tissue[c("fish_id", "tissue")])))  # one row per fish x tissue
+
+n_distinct(MWF_tissue$fish_id)   # fish with >= 1 tissue (all filters applied)
+
+# ---- tissue_df: fish with ALL three tissues (complete cases) ----
 
 complete_ids <- MWF_tissue |>
-  distinct(usgs_universal_id, sample_matrix) |>
-  count(usgs_universal_id) |>
+  distinct(fish_id, tissue) |>
+  count(fish_id) |>
   filter(n == 3) |>
-  pull(usgs_universal_id)
+  pull(fish_id)
 
-MWF_tissue_fin <- MWF_tissue |> 
-  filter(usgs_universal_id %in% complete_ids) |> 
-  filter(results_calculation == "raw")
+tissue_df <- MWF_tissue |>
+  filter(fish_id %in% complete_ids) |>
+  droplevels() |>
+  select(fish_id, tissue, se, everything(),
+         -usgs_universal_id, -sample_matrix, -result_value_mg_kg)
 
-n_distinct(MWF_tissue_fin$usgs_universal_id) # final n = 68, after filtering for qaqc and tissue types
+n_distinct(tissue_df$fish_id)    # no. of fish with complete cases
+nrow(tissue_df)                  # no. of observations
+
+levels(tissue_df$tissue)
+
+write_csv(tissue_df, "tissue_df.csv")
+
+```
+
+```{r 3b Tissue Descriptive Stats}
+colSums(is.na(tissue_df))                       # all-NA columns (subsample_wet_wt_g, invert_fxn) are irrelevant here
+count(tissue_df, tissue, sample_dry_wt_method)  # liver dry wt is mostly "estimated" (fixed 77.4% moisture)
+count(tissue_df, tissue, analytical_laboratory) # lab is almost perfectly confounded with tissue
+count(tissue_df, site_id, season_id)            # KR2 / 2022 = a single fish from this season and site
+count(tissue_df, fish_maturity_observation)     # all female (due to egg samples) - no sex effect to test
+
+tissue_summ_table <- bind_rows(
+  tissue_df |> 
+    group_by(tissue) |> 
+    summ_fun() |> 
+    mutate(tissue = as.character(tissue)), tissue_df |> 
+    summ_fun() |> 
+    mutate(tissue = "All tissues (pooled)"))
+
+tissue_summ_table <- tissue_summ_table |>
+  gt() |>
+  cols_label(tissue = "Tissue", n = "n", mean = "Mean", sd = "SD",
+            median = "Median", IQR = "IQR",
+             min = "Min", max = "Max", skewness = "Skewness") |>
+  fmt_number(columns = c(mean, sd, median, IQR, min, max), decimals = 1) |>
+  fmt_number(columns = skewness, decimals = 2) |>
+  tab_spanner(label = "Se concentration (mg/kg)",
+              columns = c(mean, sd, median, IQR, min, max)) |>
+  tab_row_group(label = "Pooled (for context only)", rows = tissue == "All tissues (pooled)") |>
+  tab_row_group(label = "By tissue", rows = tissue != "All tissues (pooled)") |>
+  row_group_order(groups = c("By tissue", "Pooled (for context only)")) |>
+  tab_footnote("Pooled row: n counts total # of tissue samples (3 per fish); n = 54 fish.",
+               locations = cells_body(columns = n, rows = tissue == "All tissues (pooled)")) |>
+  tab_header(title = "Se in Mountain Whitefish tissues (n = 54 fish, 3 tissues each)")
+
+tissue_summ_table
+
+tissue_df <- tissue_df |> 
+  mutate(log_se = log(se))
+
+log_tissue_summ_table <- bind_rows(
+  tissue_df |> 
+    group_by(tissue) |> 
+    summarise(n        = n(),
+            mean     = mean(log_se),
+            sd       = sd(log_se),
+            median   = median(log_se),
+            IQR      = IQR(log_se),
+            min      = min(log_se),
+            max      = max(log_se),
+            skewness = skewness(log_se),
+            .groups = "drop") |> 
+    mutate(tissue = as.character(tissue)), tissue_df |> 
+     summarise(n        = n(),
+            mean     = mean(log_se),
+            sd       = sd(log_se),
+            median   = median(log_se),
+            IQR      = IQR(log_se),
+            min      = min(log_se),
+            max      = max(log_se),
+            skewness = skewness(log_se),
+            .groups = "drop") |> 
+    mutate(tissue = "All tissues (pooled)"))
+
+log_tissue_summ_table <- log_tissue_summ_table |>
+  gt() |>
+  cols_label(tissue = "Tissue", n = "n", mean = "Mean", sd = "SD",
+            median = "Median", IQR = "IQR",
+             min = "Min", max = "Max", skewness = "Skewness") |>
+  fmt_number(columns = c(mean, sd, median, IQR, min, max), decimals = 1) |>
+  fmt_number(columns = skewness, decimals = 2) |>
+  tab_spanner(label = "ln Se concentration (ln mg/kg)",
+              columns = c(mean, sd, median, IQR, min, max)) |>
+  tab_row_group(label = "Pooled (for context only)", rows = tissue == "All tissues (pooled)") |>
+  tab_row_group(label = "By tissue", rows = tissue != "All tissues (pooled)") |>
+  row_group_order(groups = c("By tissue", "Pooled (for context only)")) |>
+  tab_footnote("Pooled row: n counts total # of tissue samples (3 per fish); n = 54 fish.",
+               locations = cells_body(columns = n, rows = tissue == "All tissues (pooled)")) |>
+  tab_header(title = "ln Se in Mountain Whitefish tissues (n = 54 fish, 3 tissues each)")
+
+log_tissue_summ_table
+
+## Plots
+
+# Raw distribution by tissue, with within-fish pairing shown
+tissue_raw_box <- ggplot(tissue_df, aes(tissue, se)) +
+  geom_line(aes(group = fish_id), colour = "grey70", alpha = .5) + #lines for paired fish samples
+  geom_boxplot(width = .4, outlier.shape = NA, alpha = .6) +
+  geom_jitter(width = .06, alpha = .6) +
+  labs(x = "Tissue type", y = "Se concentration (mg/kg)",
+       title = "Se in Mountain Whitefish tissues (paired by fish)") 
+
+tissue_raw_box
+# Raw vs log histograms
+
+tissue_comp_hist <- tissue_df |>
+  pivot_longer(c(se, log_se), names_to = "scale", values_to = "val") |>
+  mutate(scale = recode(scale, se = "Se (mg/kg)", log_se = "ln Se (ln mg/kg)")) |>
+  ggplot(aes(val)) +
+  geom_histogram(bins = 15, colour = "white") +
+  facet_grid(tissue ~ scale, scales = "free") +
+  labs(x = "Value", y = "Count", title = "Distribution of Se before and after log transform") +
+  theme_bw()
+
+tissue_comp_hist
 
 ```
 
