@@ -21,6 +21,9 @@ library(moments)
 install.packages(c("performance", "see"))
 library(performance)
 library(emmeans)
+library(GGally)
+library(lmtest)
+library(car)
 ```
 
 ```{r}
@@ -269,7 +272,8 @@ tissue_summ_table <- tissue_summ_table |>
 tissue_summ_table
 
 tissue_df <- tissue_df |> 
-  mutate(log_se = log(se))
+  mutate(log_se = log(se)) |> 
+  select(fish_id, tissue, se, log_se, everything())
 
 log_tissue_summ_table <- bind_rows(
   tissue_df |> 
@@ -314,7 +318,6 @@ log_tissue_summ_table <- log_tissue_summ_table |>
 log_tissue_summ_table
 
 ## Plots
-
 # Raw distribution by tissue, with within-fish pairing shown
 tissue_raw_box <- ggplot(tissue_df, aes(tissue, se)) +
   geom_line(aes(group = fish_id), colour = "grey70", alpha = .5) + #lines for paired fish samples
@@ -324,11 +327,34 @@ tissue_raw_box <- ggplot(tissue_df, aes(tissue, se)) +
        title = "Se in Mountain Whitefish tissues (paired by fish)") 
 
 tissue_raw_box
+
+tissue_raw_violin <- ggplot(tissue_df, aes(x = factor(tissue), y = se)) +
+  geom_violin() +
+  geom_jitter(width = 0.15, alpha = 0.5)+
+  geom_line(aes(group = fish_id), colour = "grey70", alpha = .5) +
+  labs(x = "Tissue type", y = "Se concentration (mg/kg)",
+       title = "Se in Mountain Whitefish tissues (paired by fish)") +
+  kukulagoh_theme
+
+
+tissue_raw_violin
+
+tissue_log_violin <- ggplot(tissue_df, aes(x = factor(tissue), y = log_se)) +
+  geom_violin() +
+  geom_jitter(width = 0.15, alpha = 0.5)+
+  geom_line(aes(group = fish_id), colour = "grey70", alpha = .5) +
+  labs(x = "Tissue type", y = "Se concentration (mg/kg)",
+       title = "ln Se in Mountain Whitefish tissues (paired by fish)") +
+  kukulagoh_theme
+
+
+tissue_log_violin
+
 # Raw vs log histograms
 
 tissue_comp_hist <- tissue_df |>
   pivot_longer(c(se, log_se), names_to = "scale", values_to = "val") |>
-  mutate(scale = recode(scale, se = "Se (mg/kg)", log_se = "ln Se (ln mg/kg)")) |>
+  mutate(scale = dplyr::recode(scale, se = "Se (mg/kg)", log_se = "ln Se (ln mg/kg)")) |>
   ggplot(aes(val)) +
   geom_histogram(bins = 15, colour = "white") +
   facet_grid(tissue ~ scale, scales = "free") +
@@ -337,25 +363,81 @@ tissue_comp_hist <- tissue_df |>
 
 tissue_comp_hist
 
+
 ```
 
 ```{r tissue model}
-#Initial model: within subjects rep measure ANOVA
+#Initial model: within subjects repeated measure ANOVA
 within_tissue_aov <- afex::aov_ez(
   id = "fish_id",
-  dv = "se",
+  dv = "log_se",
   data = tissue_df,
   between = NULL,
   within = "tissue")
 summary(within_tissue_aov) #includes Mauchly test for sphericity + GG/HF corrections
 print(within_tissue_aov) # prints GG corrected values on the model
 
-#posthoc
+# posthoc
 emmeans(within_tissue_aov, ~tissue) |> 
   pairs(adjust="tukey")
+
+# assumptions
+## for diagnostics, building a lm()-type model which gives same error term as the afex (same F-stat
+tissue_diag <- lm(log_se ~ tissue + fish_id, data = tissue_df)
+anova(tissue_diag)
+# (i) Zero conditional mean
+## residual vs fitted
+diag_df <- tissue_df |>
+  mutate(.fitted = fitted(tissue_diag),
+         .resid  = resid(tissue_diag),
+         .std    = rstandard(tissue_diag))
+
+ggplot(diag_df, aes(.fitted, .resid, colour = tissue)) +
+  geom_point(alpha = 0.7) +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  labs(x = "Fitted Se (mg/kg dry weight)",
+       y = "Residual Se (mg/kg dry weight)",
+       colour = "Tissue",
+       title = "Residuals vs fitted: repeated-measures ANOVA (ln Se)") +
+  theme_bw()
+
+## Check normality per tissue type (raw data - not the model)
+tissue_df |> 
+  group_by(tissue) |> 
+  shapiro_test(log_se)
+
+ggplot(tissue_df, aes(sample = log_se)) +
+  stat_qq() +
+  stat_qq_line(color = "red") +
+  facet_wrap(~ tissue, scales = "free") +
+  labs(
+    title = "Normal Q-Q Plot by Tissue Type",
+    x = "Theoretical Quantiles",
+    y = "Sample Quantiles"
+  ) +
+  kukulagoh_theme
+
+## Normality of residuals (whole-model)
+check_normality(within_tissue_aov) |> plot(type = "qq")
+
+# (ii) Independence and Identically Distributed
+# (iii) No large outliers
+tissue_df |> 
+  group_by(tissue) |> 
+  identify_outliers(log_se)
+
+# (v) Sphericity - already corrected for by afex aov
+
+
 ```
 
-
+Assumptions evaluation:
+- Normality: Data is not normal, gets worse with log-transformation.
+- Independence: Inheerently not independent due to within-subject design, but model deals with it by isolating within-subject changes across conditions from individual baselines. Still need to check for independence between subjects, as this can be violated by site/season
+- No multicolinearity because we only have one categorical predictor
+- Heteroscedastic:I think should be corrected for with sphericity?  Because homoscedasticity assumes independence, not relevant to within-subject design.
+- Sphericity: Initial model fails sphericity test but is corrected for by Greenhouse-Geisser correction
+- Lab/method confounder: tissue is confounded with analytical_laboratory (liver ~majority Menlo, egg/muscle ~majority EPA) Cannot be separated statistically (limitation)
 
 ## Water Stuff
 
