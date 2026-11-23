@@ -620,7 +620,8 @@ result1 <- read_waterdata_continuous(
 
 #Create df of unique sites and dates
 continuous_fcn_df <- water_processed %>% 
-  filter(sample_type != "Se(part)") %>% 
+  filter(sample_type != "Se(part)",
+         season %in% c("Spring", "Fall")) %>% 
   distinct(usgs_site_number, date) %>% 
   mutate(usgs_site_number_full = paste0("USGS-", usgs_site_number)) %>% 
   select(usgs_site_number_full, usgs_site_number, date) 
@@ -1158,6 +1159,14 @@ wq_scatter_matrix <- ggpairs(water_se,
         lower = list(continuous = wrap("points", size = 0.4)),
         upper = list(continuous = wrap("cor", size = 3)))
 wq_scatter_matrix
+
+
+library(fixest)
+
+# Outcome y, predictor x1, fixed effects for entity id and time year
+water_feols <- feols(total_se ~ discharge + gage | usgs_site_number + year, data = water_se, cluster = ~id)
+summary(water_feols)
+
 
 ```
 
