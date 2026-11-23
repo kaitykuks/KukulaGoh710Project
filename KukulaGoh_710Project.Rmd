@@ -457,10 +457,10 @@ location_dict <- read_excel("Data/Raw/USGS_All_Data_Tables.xlsx",
 
 # Initial data wrangling
 
-sediment_holder <- bio_processed %>% 
+sediment_holder <- bio_processed %>%
   filter(simplified_sample_type == "sediment",
-         results_calculation != "average") %>% 
-  select(usgs_universal_id:site_id, date, analyte, results_calculation, result_value_mg_kg) %>% 
+         results_calculation != "average") %>%
+  select(usgs_universal_id:site_id, date, analyte, results_calculation, result_value_mg_kg) %>%
   mutate(analyte = case_when(analyte == "Se" ~ "Se(part)"),
          site_id = case_when(site_id == "KR13D" ~ "KR13",
                              .default = site_id))
@@ -546,12 +546,43 @@ usgs_daily_processed <- usgs_daily_raw %>%
 
 # Daily average of pH from continuous data
 
+continuous_fcn_df <- water_processed %>% 
+  filter(sample_type != "Se(part)",
+         usgs_site_number == "12301933") %>% 
+  distinct(usgs_site_number, date) %>% 
+  filter(date =="2021-04-15")
+  
+cont_data_fcn <- function(usgs_site_number, date) {
+  
+ gage <- read_waterdata_continuous(
+    monitoring_location_id = usgs_site_number,
+    parameter_code = "00065",
+    time = date,
+    properties = "value") 
+ 
+ return(gage)
+    
+}
 
-12302055
+safe_cont_data <- possibly(cont_data_fcn, otherwise = NA)
 
-test <- read_waterdata_daily(
-  monitoring_location_id = c("USGS-12301933"),
-  parameter_code = c("00065"), time = c("2026-10-12"))
+continuous_fcn_df <- continuous_fcn_df %>% 
+  mutate(gage = map2_dbl(usgs_site_number, date, cont_data_fcn))
+
+
+test1 <- cont_data_fcn(usgs_site_number = c("USGS-12301933"),
+              date = c("2021-04-15"))
+
+
+ result1 <- read_waterdata_continuous(
+    monitoring_location_id = "USGS-12301933",
+    parameter_code = "00065",
+    time = "2019-10-28",
+    properties = "value")
+
+
+
+
 
 
 read_waterdata_continuous(
