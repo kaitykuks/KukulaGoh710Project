@@ -588,16 +588,39 @@ tryCatch({
 
 continuous_fcn_df <- continuous_fcn_df %>% 
   mutate(gage = map2(usgs_site_number_full, date, cont_gage_fcn))
+
+library(httr2)
+
+req <- request("https://api.waterdata.usgs.gov") |>
+  req_url_query(
+    api_key = Sys.getenv("GpNtH9wCthHkwb9zzkgmb99BNDgjGGhJLtd7fgW6"), # Pulls safely from your .Renviron file
+    limit = 1000                          # Optional additional query parameters
+  )
+
+usethis::edit_r_environ()
+
+API_USGS_PAT = "GpNtH9wCthHkwb9zzkgmb99BNDgjGGhJLtd7fgW6"
+
+
+resp <- req_perform(req)
+data <- resp_body_json(resp)
+
+
+result1 <- read_waterdata_continuous(
+    monitoring_location_id = "USGS-12301933",
+    parameter_code = "00060",
+    time = as.POSIXct(c("2020-10-20 00:00:00", "2020-10-21"), tzone = "America/New_York")) %>%
+   summarise(gage = (mean(value)))
+
 ```
 
 
 
-```{r usgs_data_function}
+```{r usgs_continuous_data_function}
 
 #Create df of unique sites and dates
 continuous_fcn_df <- water_processed %>% 
-  filter(sample_type != "Se(part)",
-         year(date) == 2020) %>% 
+  filter(sample_type != "Se(part)") %>% 
   distinct(usgs_site_number, date) %>% 
   mutate(usgs_site_number_full = paste0("USGS-", usgs_site_number)) %>% 
   select(usgs_site_number_full, usgs_site_number, date) 
@@ -650,30 +673,192 @@ continuous_fcn_df <- continuous_fcn_df %>%
   mutate(discharge = map2(usgs_site_number_full, date, cont_discharge_fcn))
 
 
-test1 <- cont_gage_fcn(usgs_site_number_full = "USGS-12301933",
-              date = "2018-09-27")
+#Function to pull pH (00400) 
+cont_pH_fcn <- function(usgs_site_number_full, date) {
+  
+tryCatch({
+ pH <- read_waterdata_continuous(
+    monitoring_location_id = usgs_site_number_full,
+    parameter_code = "00400",
+    time = as.POSIXct(c(date, date+1), tzone = "America/New_York"),
+    properties = "value")  %>% 
+   summarise(pH = (mean(value)))
+ 
+ return(as.numeric(pH))},
+ 
+ error = function(e) {
+    message(paste("Failed to retrieve site:", usgs_site_number_full))
+    return(NULL)
+  })
+    
+}
+
+continuous_fcn_df <- continuous_fcn_df %>% 
+  mutate(pH = map2(usgs_site_number_full, date, cont_pH_fcn))
+
+#Function to pull DO (00300) 
+cont_DO_fcn <- function(usgs_site_number_full, date) {
+  
+tryCatch({
+ DO <- read_waterdata_continuous(
+    monitoring_location_id = usgs_site_number_full,
+    parameter_code = "00300",
+    time = as.POSIXct(c(date, date+1), tzone = "America/New_York"),
+    properties = "value")  %>% 
+   summarise(DO = (mean(value)))
+ 
+ return(as.numeric(DO))},
+ 
+ error = function(e) {
+    message(paste("Failed to retrieve site:", usgs_site_number_full))
+    return(NULL)
+  })
+    
+}
+
+continuous_fcn_df <- continuous_fcn_df %>% 
+  mutate(DO = map2(usgs_site_number_full, date, cont_DO_fcn))
+
+
+#Function to pull pycocyanin (32321) 
+cont_pycocyanin_fcn <- function(usgs_site_number_full, date) {
+  
+tryCatch({
+ pycocyanin <- read_waterdata_continuous(
+    monitoring_location_id = usgs_site_number_full,
+    parameter_code = "32321",
+    time = as.POSIXct(c(date, date+1), tzone = "America/New_York"),
+    properties = "value")  %>% 
+   summarise(pycocyanin = (mean(value)))
+ 
+ return(as.numeric(pycocyanin))},
+ 
+ error = function(e) {
+    message(paste("Failed to retrieve site:", usgs_site_number_full))
+    return(NULL)
+  })
+    
+}
+
+continuous_fcn_df <- continuous_fcn_df %>% 
+  mutate(pycocyanin = map2(usgs_site_number_full, date, cont_pycocyanin_fcn))
+
+
+#Function to pull turbidity (63680) 
+cont_turbidity_fcn <- function(usgs_site_number_full, date) {
+  
+tryCatch({
+ turbidity <- read_waterdata_continuous(
+    monitoring_location_id = usgs_site_number_full,
+    parameter_code = "63680",
+    time = as.POSIXct(c(date, date+1), tzone = "America/New_York"),
+    properties = "value")  %>% 
+   summarise(turbidity = (mean(value)))
+ 
+ return(as.numeric(turbidity))},
+ 
+ error = function(e) {
+    message(paste("Failed to retrieve site:", usgs_site_number_full))
+    return(NULL)
+  })
+    
+}
+
+continuous_fcn_df <- continuous_fcn_df %>% 
+  mutate(turbidity = map2(usgs_site_number_full, date, cont_turbidity_fcn))
+
+#Function to pull chlorophyll (32315) 
+cont_chlorophyll_fcn <- function(usgs_site_number_full, date) {
+  
+tryCatch({
+ chlorophyll <- read_waterdata_continuous(
+    monitoring_location_id = usgs_site_number_full,
+    parameter_code = "32315",
+    time = as.POSIXct(c(date, date+1), tzone = "America/New_York"),
+    properties = "value")  %>% 
+   summarise(chlorophyll = (mean(value)))
+ 
+ return(as.numeric(chlorophyll))},
+ 
+ error = function(e) {
+    message(paste("Failed to retrieve site:", usgs_site_number_full))
+    return(NULL)
+  })
+    
+}
+
+continuous_fcn_df <- continuous_fcn_df %>% 
+  mutate(chlorophyll = map2(usgs_site_number_full, date, cont_chlorophyll_fcn))
+
+
+#Function to pull temperature (00010) 
+cont_temperature_fcn <- function(usgs_site_number_full, date) {
+  
+tryCatch({
+ temperature <- read_waterdata_continuous(
+    monitoring_location_id = usgs_site_number_full,
+    parameter_code = "00010",
+    time = as.POSIXct(c(date, date+1), tzone = "America/New_York"),
+    properties = "value")  %>% 
+   summarise(temperature = (mean(value)))
+ 
+ return(as.numeric(temperature))},
+ 
+ error = function(e) {
+    message(paste("Failed to retrieve site:", usgs_site_number_full))
+    return(NULL)
+  })
+    
+}
+
+continuous_fcn_df <- continuous_fcn_df %>% 
+  mutate(temperature = map2(usgs_site_number_full, date, cont_temperature_fcn))
+
+#Function to pull conductance (00095)
+cont_conductance_fcn <- function(usgs_site_number_full, date) {
+  
+tryCatch({
+ conductance <- read_waterdata_continuous(
+    monitoring_location_id = usgs_site_number_full,
+    parameter_code = "00095",
+    time = as.POSIXct(c(date, date+1), tzone = "America/New_York"),
+    properties = "value")  %>% 
+   summarise(conductance = (mean(value)))
+ 
+ return(as.numeric(conductance))},
+ 
+ error = function(e) {
+    message(paste("Failed to retrieve site:", usgs_site_number_full))
+    return(NULL)
+  })
+    
+}
+
+continuous_fcn_df <- continuous_fcn_df %>% 
+  mutate(conductance = map2(usgs_site_number_full, date, cont_conductance_fcn))
+
+
+# 
+# test1 <- cont_gage_fcn(usgs_site_number_full = "USGS-12301933",
+#               date = "2020-10-20")
 
 # Join data to the final df
-water_se <- water_processed %>% 
-  filter(sample_type != "Se(part)") %>% 
-  mutate(year = year(date),
-         month = month(date),
-         day = day(date),
-         season = case_when(month %in% c(3,4,5) ~ "Spring",
-                            month %in% c(8,9,10) ~ "Fall")) %>% 
-  select(date, year, month, day, season, site_name, site_id, usgs_site_number, analyte, result) %>% 
-  group_by(site_name, year, month, day, date, season, usgs_site_number) %>%
-  summarise(total_se = sum(result, na.rm = TRUE)) %>% 
-  ungroup() %>% 
-  arrange(year) %>% 
-  filter(season %in% c("Fall", "Spring"))  %>% 
-  full_join(continuous_fcn_df, by = c("usgs_site_number", "date"))
+# water_se <- water_processed %>% 
+#   filter(sample_type != "Se(part)") %>% 
+#   mutate(year = year(date),
+#          month = month(date),
+#          day = day(date),
+#          season = case_when(month %in% c(3,4,5) ~ "Spring",
+#                             month %in% c(8,9,10) ~ "Fall")) %>% 
+#   select(date, year, month, day, season, site_name, site_id, usgs_site_number, analyte, result) %>% 
+#   group_by(site_name, year, month, day, date, season, usgs_site_number) %>%
+#   summarise(total_se = sum(result, na.rm = TRUE)) %>% 
+#   ungroup() %>% 
+#   arrange(year) %>% 
+#   filter(season %in% c("Fall", "Spring"))  %>% 
+#   full_join(continuous_fcn_df, by = c("usgs_site_number", "date"))
+# 
 
- result1 <- read_waterdata_continuous(
-    monitoring_location_id = "USGS-12301933",
-    parameter_code = "00065",
-    time = as.POSIXct(c("2018-09-27 00:00:00", "2018-09-28"), tzone = "America/New_York")) %>% 
-   summarise(gage = (mean(value)))
 
 ```
 
