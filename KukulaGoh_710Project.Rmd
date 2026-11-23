@@ -476,8 +476,7 @@ water_processed <- water_raw %>%
   mutate(usgs_site_number = case_when(usgs_site_number == "12307750" ~ "12309500",
                                       usgs_site_number == "12303500" ~ "12304500",
                                       usgs_site_number == "12301919" ~ "12301933",
-                                      .default = usgs_site_number)) %>% 
-  full_join(sediment_holder)
+                                      .default = usgs_site_number))
 
 ```
 
