@@ -24,7 +24,18 @@ library(emmeans)
 library(GGally)
 library(lmtest)
 library(car)
+
+install.packages('curl')
+
 ```
+
+
+curl -i 'X-Api-Key: GpNtH9wCthHkwb9zzkgmb99BNDgjGGhJLtd7fgW6' 'https://api.waterdata.usgs.gov/ogcapi/v1/collections/daily/items?limit=1'
+
+curl -H 'X-Api-Key: GpNtH9wCthHkwb9zzkgmb99BNDgjGGhJLtd7fgW6' 'https://api.waterdata.usgs.gov/ogcapi/v1/collections/daily/items?limit=1'
+
+
+
 
 ```{r}
 
@@ -542,22 +553,25 @@ usgs_daily_processed <- usgs_daily_raw %>%
 ```
 
 
-```{r usgs_data_function}
+```{r usgs_data_function_BACKUP}
+
+
+## NOTE TO SELF DO NOT DELETE OR EDIT UNDER ANY CIRCUMSTANCES BECAUSE THIS WORKS!!!!!!!!!!!!!
 
 #Create df of unique sites and dates
 continuous_fcn_df <- water_processed %>% 
   filter(sample_type != "Se(part)") %>% 
   distinct(usgs_site_number, date) %>% 
   mutate(usgs_site_number_full = paste0("USGS-", usgs_site_number)) %>% 
-  select(usgs_site_number_full, usgs_site_number, date)
+  select(usgs_site_number_full, usgs_site_number, date) 
 
  
 #Function to pull gage height (00065) 
-cont_gage_fcn <- function(usgs_site_number, date) {
+cont_gage_fcn <- function(usgs_site_number_full, date) {
   
 tryCatch({
  gage <- read_waterdata_continuous(
-    monitoring_location_id = paste0c("USGS-", usgs_site_number),
+    monitoring_location_id = usgs_site_number_full,
     parameter_code = "00065",
     time = as.POSIXct(c(date, date+1), tzone = "America/New_York"),
     properties = "value")  %>% 
@@ -566,7 +580,44 @@ tryCatch({
  return(as.numeric(gage))},
  
  error = function(e) {
-    message(paste("Failed to retrieve site:", usgs_site_number))
+    message(paste("Failed to retrieve site:", usgs_site_number_full))
+    return(NULL)
+  })
+    
+}
+
+continuous_fcn_df <- continuous_fcn_df %>% 
+  mutate(gage = map2(usgs_site_number_full, date, cont_gage_fcn))
+```
+
+
+
+```{r usgs_data_function}
+
+#Create df of unique sites and dates
+continuous_fcn_df <- water_processed %>% 
+  filter(sample_type != "Se(part)",
+         year(date) == 2020) %>% 
+  distinct(usgs_site_number, date) %>% 
+  mutate(usgs_site_number_full = paste0("USGS-", usgs_site_number)) %>% 
+  select(usgs_site_number_full, usgs_site_number, date) 
+
+ 
+#Function to pull gage height (00065) 
+cont_gage_fcn <- function(usgs_site_number_full, date) {
+  
+tryCatch({
+ gage <- read_waterdata_continuous(
+    monitoring_location_id = usgs_site_number_full,
+    parameter_code = "00065",
+    time = as.POSIXct(c(date, date+1), tzone = "America/New_York"),
+    properties = "value")  %>% 
+   summarise(gage = (mean(value)))
+ 
+ return(as.numeric(gage))},
+ 
+ error = function(e) {
+    message(paste("Failed to retrieve site:", usgs_site_number_full))
     return(NULL)
   })
     
@@ -575,13 +626,32 @@ tryCatch({
 continuous_fcn_df <- continuous_fcn_df %>% 
   mutate(gage = map2(usgs_site_number_full, date, cont_gage_fcn))
 
+#Function to pull discharge (00060) 
+cont_discharge_fcn <- function(usgs_site_number_full, date) {
+  
+tryCatch({
+ discharge <- read_waterdata_continuous(
+    monitoring_location_id = usgs_site_number_full,
+    parameter_code = "00060",
+    time = as.POSIXct(c(date, date+1), tzone = "America/New_York"),
+    properties = "value")  %>% 
+   summarise(discharge = (mean(value)))
+ 
+ return(as.numeric(discharge))},
+ 
+ error = function(e) {
+    message(paste("Failed to retrieve site:", usgs_site_number_full))
+    return(NULL)
+  })
+    
+}
+
+continuous_fcn_df <- continuous_fcn_df %>% 
+  mutate(discharge = map2(usgs_site_number_full, date, cont_discharge_fcn))
 
 
-
-test1 <- cont_gage_fcn(usgs_site_number = "USGS-12301933",
+test1 <- cont_gage_fcn(usgs_site_number_full = "USGS-12301933",
               date = "2018-09-27")
-
-
 
 # Join data to the final df
 water_se <- water_processed %>% 
@@ -598,15 +668,6 @@ water_se <- water_processed %>%
   arrange(year) %>% 
   filter(season %in% c("Fall", "Spring"))  %>% 
   full_join(continuous_fcn_df, by = c("usgs_site_number", "date"))
-
-
-
-
-
-
-test1 <- cont_gage_fcn(usgs_site_number = "USGS-12301933",
-              date = "2018-09-27")
-
 
  result1 <- read_waterdata_continuous(
     monitoring_location_id = "USGS-12301933",
