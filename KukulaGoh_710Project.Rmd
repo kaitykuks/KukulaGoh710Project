@@ -29,37 +29,28 @@ install.packages('curl')
 
 ```
 
-
-curl -i 'X-Api-Key: GpNtH9wCthHkwb9zzkgmb99BNDgjGGhJLtd7fgW6' 'https://api.waterdata.usgs.gov/ogcapi/v1/collections/daily/items?limit=1'
-
-curl -H 'X-Api-Key: GpNtH9wCthHkwb9zzkgmb99BNDgjGGhJLtd7fgW6' 'https://api.waterdata.usgs.gov/ogcapi/v1/collections/daily/items?limit=1'
-
-
-
-
 ```{r}
 
 rm(list=ls())
 
 ```
 
-
 ```{r plot_theme, echo = FALSE, include = FALSE}
 
-# Create plot theme
-kukulagoh_theme <- theme_classic() +
-  theme(plot.title = element_text(size = 11, hjust = 0.5, face = "bold"), #Adjust title
-        plot.subtitle = element_text(size = 10, hjust = 0.5),
-        axis.text.x = element_text(size = 9), # Adjust x-axis values
-        axis.text.y = element_text(size = 9), # Adjust y-axis values
-        axis.title.x = element_text(size = 10.5), # Adjust x-axis title
-        axis.title.y = element_text(size = 10.5), # Adjust y-axis title
-        legend.position = "bottom", # Define legend position
-        legend.text = element_text(size = 9), # Define legend entry sizes
-        legend.title = element_text(size = 9)) # Define legend name sizes
-
-# Set theme globally
-theme_set(kukulagoh_theme)
+# # Create plot theme
+# kukulagoh_theme <- theme_classic() +
+#   theme(plot.title = element_text(size = 11, hjust = 0.5, face = "bold"), #Adjust title
+#         plot.subtitle = element_text(size = 10, hjust = 0.5),
+#         axis.text.x = element_text(size = 9), # Adjust x-axis values
+#         axis.text.y = element_text(size = 9), # Adjust y-axis values
+#         axis.title.x = element_text(size = 10.5), # Adjust x-axis title
+#         axis.title.y = element_text(size = 10.5), # Adjust y-axis title
+#         legend.position = "bottom", # Define legend position
+#         legend.text = element_text(size = 9), # Define legend entry sizes
+#         legend.title = element_text(size = 9)) # Define legend name sizes
+# 
+# # Set theme globally
+# theme_set(kukulagoh_theme)
 
 # Summ stats function for Se
 summ_fun <- function(d) d |>
@@ -513,115 +504,11 @@ Continuous data
 32315: Chlorophyll relative fluorescence [RFU]
 
 
-```{r usgs_daily_data}
-
-# Daily average of discharge, gage, temperature, pH, and specific conductance from daily data
-
-usgs_daily_raw <- 
-  
-  read_waterdata_daily(
-  monitoring_location_id = c("USGS-12301933", "USGS-12302055", "USGS-12304500",
-                             "USGS-12305000", "USGS-12307750", "USGS-12310100",
-                             "USGS-12322000", "USGS-12303500", "USGS-12301919"),
-  parameter_code = c("00060", "00065", "00010", "00400", "00095"),
-  time = c("2018-03-28", "2023-09-14"))
-
-# Processed
-
-usgs_daily_processed <- usgs_daily_raw %>% 
-  mutate(year = year(time),
-         month = month(time),
-         day = day(time),
-         season = case_when(month %in% c(3,4,5) ~ "Spring",
-                            month %in% c(8,9,10) ~ "Fall")) %>% 
-  na.omit(season) %>% 
-  separate_wider_delim(
-    cols = monitoring_location_id, 
-    delim = "USGS-", 
-    names = c("holder", "usgs_site_number")) %>%
-  mutate(parameter = case_when(parameter_code == "00060" ~ "discharge",
-                               parameter_code == "00065" ~ "gage_height",
-                               parameter_code == "00010" ~ "temperature",
-                               parameter_code == "00400" ~ "pH",
-                               parameter_code == "00095" ~ "specific_conductance")) %>% 
-  group_by(year, season, usgs_site_number, parameter) %>% 
-  summarise(mean = mean(value)) %>% 
-  ungroup() %>% 
-  pivot_wider(names_from = parameter, values_from = mean) %>% 
-  select(-pH)
-
-```
-
-
-```{r usgs_data_function_BACKUP}
-
-
-## NOTE TO SELF DO NOT DELETE OR EDIT UNDER ANY CIRCUMSTANCES BECAUSE THIS WORKS!!!!!!!!!!!!!
-
-#Create df of unique sites and dates
-continuous_fcn_df_test <- water_processed %>% 
-  filter(sample_type != "Se(part)") %>% 
-  distinct(usgs_site_number, date) %>% 
-  mutate(usgs_site_number_full = paste0("USGS-", usgs_site_number)) %>% 
-  select(usgs_site_number_full, usgs_site_number, date) 
-
- 
-#Function to pull gage height (00065) 
-cont_gage_fcn_test <- function(usgs_site_number_full, date) {
-  
-tryCatch({
- gage <- read_waterdata_continuous(
-    monitoring_location_id = usgs_site_number_full,
-    parameter_code = "00065",
-    time = as.POSIXct(c(date, date+1), tzone = "America/New_York"),
-    properties = "value")  %>% 
-   summarise(gage = (mean(value)))
- 
- return(as.numeric(gage))},
- 
- error = function(e) {
-    message(paste("Failed to retrieve site:", usgs_site_number_full))
-    return(NULL)
-  })
-    
-}
-
-continuous_fcn_df_test <- continuous_fcn_df_test %>% 
-  mutate(gage = map2(usgs_site_number_full, date, cont_gage_fcn_test))
-
-library(httr2)
-
-req <- request("https://api.waterdata.usgs.gov") |>
-  req_url_query(
-    api_key = Sys.getenv("GpNtH9wCthHkwb9zzkgmb99BNDgjGGhJLtd7fgW6"), # Pulls safely from your .Renviron file
-    limit = 1000                          # Optional additional query parameters
-  )
-
-usethis::edit_r_environ()
-
-API_USGS_PAT = "GpNtH9wCthHkwb9zzkgmb99BNDgjGGhJLtd7fgW6"
-
-
-resp <- req_perform(req)
-data <- resp_body_json(resp)
-
-
-result1 <- read_waterdata_continuous(
-    monitoring_location_id = "USGS-12301933",
-    parameter_code = "00060",
-    time = as.POSIXct(c("2020-10-20 00:00:00", "2020-10-21"), tzone = "America/New_York")) %>%
-   summarise(gage = (mean(value)))
-
-```
-
-
-
 ```{r usgs_continuous_data_function}
 
 #Create df of unique sites and dates
 continuous_fcn_df <- water_processed %>% 
-  filter(sample_type != "Se(part)",
-         season %in% c("Spring", "Fall")) %>% 
+  filter(sample_type != "Se(part)") %>% 
   distinct(usgs_site_number, date) %>% 
   mutate(usgs_site_number_full = paste0("USGS-", usgs_site_number)) %>% 
   select(usgs_site_number_full, usgs_site_number, date) 
@@ -846,176 +733,8 @@ continuous_fcn_df <- continuous_fcn_df %>%
 # continuous_fcn_df_test <- continuous_fcn_df %>%
 #   mutate(gage = as.double(unlist(gage)))
 # 
-# 
-# 
-# 
 # test1 <- cont_gage_fcn(usgs_site_number_full = "USGS-12301933",
 #               date = "2020-10-20")
-
-```
-
-
-```{r usgs_cont_ph}
-
-# read_waterdata_continuous(
-#   monitoring_location_id = c("USGS-12301933"),
-#   parameter_code = c("00400"), time = c("2019-03-28", "2019-10-27"))
-# 
-# usgs_cont_ph_raw <- rbind(
-#   
-#   read_waterdata_continuous(
-#   monitoring_location_id = c("USGS-12301933", "USGS-12302055", "USGS-12304500",
-#                              "USGS-12305000", "USGS-12307750", "USGS-12310100",
-#                              "USGS-12322000", "USGS-12303500", "USGS-12301919"),
-#   parameter_code = c("00400"), time = c("2018-03-28", "2019-03-27")),
-#   
-#   read_waterdata_continuous(
-#   monitoring_location_id = c("USGS-12301933", "USGS-12302055", "USGS-12304500",
-#                              "USGS-12305000", "USGS-12307750", "USGS-12310100",
-#                              "USGS-12322000", "USGS-12303500", "USGS-12301919"),
-#   parameter_code = c("00400"), time = c("2019-03-28", "2021-09-14")),
-#   
-#   read_waterdata_continuous(
-#   monitoring_location_id = c("USGS-12301933", "USGS-12302055", "USGS-12304500",
-#                              "USGS-12305000", "USGS-12307750", "USGS-12310100",
-#                              "USGS-12322000", "USGS-12303500", "USGS-12301919"),
-#   parameter_code = c("00400"), time = c("2021-09-15", "2023-09-14")))
-# 
-# # Processed
-# 
-# usgs_cont_ph_processed <- usgs_cont_ph_raw %>% 
-#   mutate(date = as.Date(time),
-#          year = year(time),
-#          month = month(time),
-#          day = day(time)) %>% 
-#   separate_wider_delim(
-#   cols = monitoring_location_id, 
-#   delim = "USGS-", 
-#   names = c("holder", "usgs_site_number")) %>% 
-#   mutate(parameter = case_when(parameter_code == "00400" ~ "pH")) %>% 
-#   group_by(year, month, day, usgs_site_number, parameter) %>% 
-#   summarise(mean = mean(value)) %>% 
-#   ungroup() %>% 
-#   pivot_wider(names_from = parameter, values_from = mean) %>% 
-#   mutate(date = make_date(year = year, month = month, day = day),
-#          season = case_when(month %in% c(3,4,5) ~ "Spring",
-#                             month %in% c(8,9,10) ~ "Fall")) %>% 
-#   filter(season %in% c("Fall", "Spring")) %>% 
-#   arrange(year, month, day)
-
-```
-
-
-```{r usgs_cont_minors}
-
-# Daily average of minor parameters from continuous data
-
-# usgs_cont_minors_raw <- rbind(
-#   
-#   read_waterdata_continuous(
-#   monitoring_location_id = c("USGS-12301933", "USGS-12302055", "USGS-12304500",
-#                              "USGS-12305000", "USGS-12307750", "USGS-12310100",
-#                              "USGS-12322000", "USGS-12303500", "USGS-12301919"),
-#   parameter_code = c("00300", "63680", "32321"),
-#   time = c("2018-09-28", "2020-09-27")),
-# 
-#   read_waterdata_continuous(
-#   monitoring_location_id = c("USGS-12301933", "USGS-12302055", "USGS-12304500",
-#                              "USGS-12305000", "USGS-12307750", "USGS-12310100",
-#                              "USGS-12322000", "USGS-12303500", "USGS-12301919"),
-#   parameter_code = c("00300", "63680", "32321"),
-#   time = c("2020-09-28", "2021-09-28")),
-# 
-#   read_waterdata_continuous(
-#   monitoring_location_id = c("USGS-12301933", "USGS-12302055", "USGS-12304500",
-#                              "USGS-12305000", "USGS-12307750", "USGS-12310100",
-#                              "USGS-12322000", "USGS-12303500", "USGS-12301919"),
-#   parameter_code = c("00300", "63680", "32321"),
-#   time = c("2021-09-29", "2022-09-14")),
-# 
-#   read_waterdata_continuous(
-#   monitoring_location_id = c("USGS-12301933", "USGS-12302055", "USGS-12304500",
-#                              "USGS-12305000", "USGS-12307750", "USGS-12310100",
-#                              "USGS-12322000", "USGS-12303500", "USGS-12301919"),
-#   parameter_code = c("00300", "63680", "32321"),
-#   time = c("2022-09-15", "2023-09-14"))
-#   
-# )
-# 
-# usgs_cont_metabolism_raw <- rbind(
-#   
-#   read_waterdata_continuous(
-#   monitoring_location_id = c("USGS-12301933", "USGS-12302055", "USGS-12304500",
-#                              "USGS-12305000", "USGS-12307750", "USGS-12310100",
-#                              "USGS-12322000", "USGS-12303500", "USGS-12301919"),
-#   parameter_code = c("32315"),
-#   time = c("2018-09-28", "2020-09-27")),
-# 
-#   read_waterdata_continuous(
-#   monitoring_location_id = c("USGS-12301933", "USGS-12302055", "USGS-12304500",
-#                              "USGS-12305000", "USGS-12307750", "USGS-12310100",
-#                              "USGS-12322000", "USGS-12303500", "USGS-12301919"),
-#   parameter_code = c("32315"),
-#   time = c("2020-09-28", "2021-09-28")),
-# 
-#   read_waterdata_continuous(
-#   monitoring_location_id = c("USGS-12301933", "USGS-12302055", "USGS-12304500",
-#                              "USGS-12305000", "USGS-12307750", "USGS-12310100",
-#                              "USGS-12322000", "USGS-12303500", "USGS-12301919"),
-#   parameter_code = c("32315"),
-#   time = c("2021-09-29", "2022-09-14")),
-# 
-#   read_waterdata_continuous(
-#   monitoring_location_id = c("USGS-12301933", "USGS-12302055", "USGS-12304500",
-#                              "USGS-12305000", "USGS-12307750", "USGS-12310100",
-#                              "USGS-12322000", "USGS-12303500", "USGS-12301919"),
-#   parameter_code = c("32315"),
-#   time = c("2022-09-15", "2023-09-14")))
-# 
-# # Processed
-# 
-# usgs_cont_metabolism_processed <- usgs_cont_metabolism_raw %>% 
-#   mutate(date = as.Date(time),
-#          year = year(time),
-#          month = month(time),
-#          day = day(time)) %>% 
-#   separate_wider_delim(
-#     cols = monitoring_location_id, 
-#     delim = "USGS-", 
-#     names = c("holder", "usgs_site_number")) %>% 
-#   mutate(parameter = case_when(parameter_code == "32315" ~ "chlorophyll")) %>% 
-#   group_by(year, month, day, usgs_site_number, parameter) %>% 
-#   summarise(mean = mean(value)) %>% 
-#   ungroup() %>% 
-#   pivot_wider(names_from = parameter, values_from = mean) %>% 
-#   mutate(date = make_date(year = year, month = month, day = day),
-#          season = case_when(month %in% c(3,4,5) ~ "Spring",
-#                             month %in% c(8,9,10) ~ "Fall")) %>% 
-#   filter(season %in% c("Fall", "Spring")) %>% 
-#   arrange(year, month, day)
-# 
-# usgs_cont_minors_processed <- usgs_cont_minors_raw %>% 
-#   mutate(date = as.Date(time),
-#          year = year(time),
-#          month = month(time),
-#          day = day(time)) %>% 
-#   separate_wider_delim(
-#   cols = monitoring_location_id, 
-#   delim = "USGS-", 
-#   names = c("holder", "usgs_site_number")) %>% 
-#   mutate(parameter = case_when(parameter_code == "32321" ~ "phycocyanin",
-#                                parameter_code == "00300" ~ "dis_oxygen",
-#                                parameter_code == "63680" ~ "turbidity")) %>% 
-#   group_by(year, month, day, usgs_site_number, parameter) %>% 
-#   summarise(mean = mean(value)) %>% 
-#   ungroup() %>% 
-#   pivot_wider(names_from = parameter, values_from = mean) %>% 
-#   mutate(date = make_date(year = year, month = month, day = day),
-#          season = case_when(month %in% c(3,4,5) ~ "Spring",
-#                             month %in% c(8,9,10) ~ "Fall")) %>% 
-#   filter(season %in% c("Fall", "Spring")) %>% 
-#   select(-phycocyanin) %>% 
-#   arrange(year, month, day)
 
 ```
 
@@ -1090,7 +809,7 @@ se_full_speciation_site_2021 <- water_processed %>%
   ungroup()
 
 # Total dissolved Se concentrations in water samples from the Kootenai River watershed study area in the Spring
-world <- water_processed %>% 
+total_se_all_years <- water_processed %>% 
   mutate(year = year(date),
          month = month(date),
          season = case_when(month %in% c(3,4,5) ~ "Spring",
@@ -1130,30 +849,17 @@ water_se <- water_processed %>%
   ungroup() %>%
   arrange(year) %>%
   filter(season %in% c("Fall", "Spring"))  %>%
-  full_join(continuous_fcn_df, by = c("usgs_site_number", "date"))
-
-water_se <- water_se %>% 
+  left_join(continuous_fcn_df, by = c("usgs_site_number", "date")) %>% 
   unnest(c(gage, discharge, pH, DO, pycocyanin, turbidity, chlorophyll, temperature, conductance))
 
 
-# water_usgs_df <- usgs_cont_metabolism_processed %>%
-#   full_join(usgs_cont_ph_processed,
-#             by = c("usgs_site_number", "date", "year", "month", "day", "season")) %>%
-#   full_join(usgs_cont_minors_processed,
-#             by = c("usgs_site_number", "date", "year", "month", "day", "season")) %>%
-#   full_join(usgs_cont_metabolism_processed,
-#             by = c("usgs_site_number", "date", "year", "month", "day", "season", "chlorophyll"))
-
-#%>% 
-  #left_join(usgs_daily_processed, by = c("usgs_site_number", "year", "season")) %>% 
-  #left_join(water_usgs_df, by = c("usgs_site_number", "year", "month", "day", "season", "date"))
 
 ```
 
 ```{r wq_linear_model}
 
 wq_scatter_matrix <- ggpairs(water_se, 
-        columns = c("discharge", "gage", "temperature", "total_se"),
+        columns = c("season", "discharge", "gage", "temperature", "total_se"),
         title = "", 
         axisLabels = "show",
         lower = list(continuous = wrap("points", size = 0.4)),
@@ -1163,8 +869,7 @@ wq_scatter_matrix
 
 library(fixest)
 
-# Outcome y, predictor x1, fixed effects for entity id and time year
-water_feols <- feols(total_se ~ discharge + gage | usgs_site_number + year, data = water_se, cluster = ~id)
+water_feols <- feols(total_se ~ discharge + gage + season | year, data = water_se, cluster = ~usgs_site_number)
 summary(water_feols)
 
 
