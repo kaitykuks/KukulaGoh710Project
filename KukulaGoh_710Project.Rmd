@@ -64,6 +64,17 @@ summ_fun <- function(d) d |>
             skewness = skewness(se),
             .groups = "drop")
 
+log_summ_fun <- function(d) d |>
+  summarise(n        = n(),
+            mean     = mean(log_se),
+            sd       = sd(log_se),
+            median   = median(log_se),
+            IQR      = IQR(log_se),
+            min      = min(log_se),
+            max      = max(log_se),
+            skewness = skewness(log_se),
+            .groups = "drop")
+
 ```
 
 ## Importing Dataset
@@ -102,7 +113,7 @@ unique(bio_processed$sample_matrix)
 ```
 
 
-```{r sp_dict wrangle}
+```{r Trophic wrangle}
 #Importing Species Dictionary
 sp_dict <- read_excel("Data/Raw/USGS_All_Data_Tables.xlsx",
     sheet = "Table3_Species-Dictionary",
@@ -167,10 +178,83 @@ trophic_df |>
   filter(is.na(trophic_level)) |> 
   count(species_id, aggregation) #missing values - SED, n = 27
 
-write_csv(trophic_df, "trophic_df.csv")
+#write_csv(trophic_df, "trophic_df.csv")
 
 ```
 
+```{r Trophic descriptive}
+troph_se_df <- trophic_df %>%
+  filter(!is.na(trophic_level), !is.na(result_value_mg_kg)) %>%
+  mutate(
+    trophic_level = factor(
+      trophic_level,
+      levels = c("L1_Resource", "L2_Pconsumer", "L3_Sconsumer", "L4_TopPredator"),
+      labels = c("L1 Resource", "L2 Primary\nconsumer",
+                 "L3 Secondary\nconsumer", "L4 Top\npredator"))) |> 
+  mutate(se      = result_value_mg_kg,
+         log_se = log(se))
+
+troph_se_summary <- troph_se_df |> 
+  group_by(trophic_level) |> 
+  summ_fun() %>%
+  mutate(across(where(is.numeric), ~ round(.x, 2)))
+
+troph_se_summary
+
+log_trophic_summary <- bind_rows(
+  troph_se_df |> 
+    group_by(trophic_level) |> 
+    log_summ_fun() |> 
+    mutate(trophic_level = as.character(trophic_level)), troph_se_df |> 
+     log_summ_fun() |> 
+    mutate(trophic_level = "All trophic levels (pooled)"))
+
+log_trophic_summary
+```
+
+```{r Trophic Plots}
+trophic_log_box <- ggplot(troph_se_df, aes(trophic_level, log_se)) +
+  geom_boxplot(width = .4, outlier.shape = NA, alpha = .6) +
+  geom_jitter(width = .06, alpha = .6) +
+  labs(x = "Trophic Level", y = "ln Se concentration (ln mg/kg)",
+       title = "ln Se across trophic levels") 
+
+trophic_log_box
+
+trophic_log_violin <- ggplot(troph_se_df, aes(x = factor(trophic_level), y = log_se)) +
+  geom_violin() +
+  geom_jitter(width = 0.15, alpha = 0.5)+
+  labs(x = "Trophic Level", y = "ln Se concentration (ln mg/kg)",
+       title = "ln Se across trophic levels") 
+
+trophic_log_violin
+
+# Raw vs log histograms
+
+trophic_comp_hist <- troph_se_df |>
+  pivot_longer(c(se, log_se), names_to = "scale", values_to = "val") |>
+  mutate(scale = dplyr::recode(scale, se = "Se (mg/kg)", log_se = "ln Se (ln mg/kg)")) |>
+  ggplot(aes(val)) +
+  geom_histogram(bins = 15, colour = "white") +
+  facet_grid(trophic_level ~ scale, scales = "free") +
+  labs(x = "Value", y = "Count", title = "Distribution of Se before and after log transform") +
+  theme_bw()
+
+trophic_comp_hist
+
+
+#interaction between sample matrix and trophic level
+trophic_matrix <- trophic_df |> filter(sample_matrix %in% c("Fish_EGG", "Fish_LVR", "Fish_MSC"))
+
+m_add <- glmmTMB(result_value_mg_kg ~ trophic_level + sample_matrix + (1 | site_id),
+                 family = Gamma("log"), data = trophic_matrix)
+m_int <- update(m_add, . ~ trophic_level * sample_matrix + (1 | site_id))
+
+anova(m_add, m_int)
+
+emmeans(m_int, ~ trophic_level | sample_matrix, type = "response")
+pairs(emmeans(m_int, ~ trophic_level | sample_matrix), type = "response")
+```
 
 # Question 3: Does Se concentration differ between tissue types in Mountain Whitefish?
 ## Hypotheses
@@ -280,25 +364,9 @@ tissue_df <- tissue_df |>
 log_tissue_summ_table <- bind_rows(
   tissue_df |> 
     group_by(tissue) |> 
-    summarise(n        = n(),
-            mean     = mean(log_se),
-            sd       = sd(log_se),
-            median   = median(log_se),
-            IQR      = IQR(log_se),
-            min      = min(log_se),
-            max      = max(log_se),
-            skewness = skewness(log_se),
-            .groups = "drop") |> 
+    log_summ_fun() |> 
     mutate(tissue = as.character(tissue)), tissue_df |> 
-     summarise(n        = n(),
-            mean     = mean(log_se),
-            sd       = sd(log_se),
-            median   = median(log_se),
-            IQR      = IQR(log_se),
-            min      = min(log_se),
-            max      = max(log_se),
-            skewness = skewness(log_se),
-            .groups = "drop") |> 
+     log_summ_fun() |> 
     mutate(tissue = "All tissues (pooled)"))
 
 log_tissue_summ_table <- log_tissue_summ_table |>
